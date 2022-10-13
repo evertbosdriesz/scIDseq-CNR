@@ -1,0 +1,590 @@
+[ {
+  "format_version" : "1.0",
+  "generated_by" : "cytoscape-3.8.2",
+  "target_cytoscapejs_version" : "~2.1",
+  "title" : "xx",
+  "style" : [ {
+    "selector" : "node",
+    "css" : {
+      "height" : 15.0,
+      "border-width" : 2.0,
+      "text-valign" : "top",
+      "text-halign" : "center",
+      "background-opacity" : 1.0,
+      "shape" : "ellipse",
+      "width" : 15.0,
+      "font-family" : "Dialog",
+      "font-weight" : "normal",
+      "background-color" : "rgb(241,240,240)",
+      "color" : "rgb(0,0,0)",
+      "border-color" : "rgb(0,0,0)",
+      "text-opacity" : 1.0,
+      "border-opacity" : 0.0,
+      "font-size" : 10,
+      "content" : "data(name)"
+    }
+  }, {
+    "selector" : "node[name = 'ITGB1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'H2AX']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Ras']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'g-secretase']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'JNK']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'cyclinB1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'MEK-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TGM1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'b-catenin']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'BMPR']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'PI3K']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Rb-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Myc']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'LRP6-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'EGFR-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Akt2']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'JNK-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'JAK1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'GSK3b']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'IGFBP_3']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'SMAD2/3-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Cytokine']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'RSK-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'cyclinE']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TGFb']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'FAK-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'p70S6K-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'p63']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Kalikrein6']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'ERK12']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Erk1/2-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'BMPR-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'STAT5-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'STAT3-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Notch1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Notch2']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Nck']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'STAT1-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Notch3']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'NICD1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'PIP3']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'p38-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'GAPDH']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'MAPKAP2-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'S6-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'PKB-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Hes1-5']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TGFR-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'IKBA']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TCF/LEF']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'SRC']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'mTOR-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'NFkB']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'DLL1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'EGFR']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Id1-4']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Jun-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'IkBa-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'smad3']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'smad1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TAK1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'MSK1/2']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'PLC-p1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'CREB-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TGFR']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'PLC-p2']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'PAK-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Wnt']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TNFR']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Src-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'SMAD4']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'JAG1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'BMP']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'cdk4']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'STAT1']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'EGF']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'JAK-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'IKK']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TNFR-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'KLF4']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'SMAD7']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'EphrinB3']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Fzd']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'FAK']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'TNFa']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'FOS-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'CytokineReceptor']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'Raf']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'RNA_POLII']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'SMAD1/5/8/-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'H3S10-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'DVL']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'MKK3/6-p']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[name = 'cdc2']",
+    "css" : {
+      "border-opacity" : 1.0
+    }
+  }, {
+    "selector" : "node[iRSK_log2_fold_change > 0,5]",
+    "css" : {
+      "background-color" : "rgb(255,0,51)"
+    }
+  }, {
+    "selector" : "node[iRSK_log2_fold_change = 0,5]",
+    "css" : {
+      "background-color" : "rgb(255,0,0)"
+    }
+  }, {
+    "selector" : "node[iRSK_log2_fold_change > 0][iRSK_log2_fold_change < 0,5]",
+    "css" : {
+      "background-color" : "mapData(iRSK_log2_fold_change,0,0,5,rgb(255,255,255),rgb(255,0,0))"
+    }
+  }, {
+    "selector" : "node[iRSK_log2_fold_change > -0,5][iRSK_log2_fold_change < 0]",
+    "css" : {
+      "background-color" : "mapData(iRSK_log2_fold_change,-0,5,0,rgb(0,0,255),rgb(255,255,255))"
+    }
+  }, {
+    "selector" : "node[iRSK_log2_fold_change = -0,5]",
+    "css" : {
+      "background-color" : "rgb(0,0,255)"
+    }
+  }, {
+    "selector" : "node[iRSK_log2_fold_change < -0,5]",
+    "css" : {
+      "background-color" : "rgb(0,0,255)"
+    }
+  }, {
+    "selector" : "node:selected",
+    "css" : {
+      "background-color" : "rgb(255,255,0)"
+    }
+  }, {
+    "selector" : "edge",
+    "css" : {
+      "opacity" : 1.0,
+      "source-arrow-color" : "rgb(0,0,0)",
+      "width" : 1.0,
+      "line-color" : "rgb(0,0,0)",
+      "text-opacity" : 1.0,
+      "source-arrow-shape" : "none",
+      "font-family" : "Dialog",
+      "font-weight" : "normal",
+      "content" : "",
+      "line-style" : "solid",
+      "target-arrow-shape" : "none",
+      "target-arrow-color" : "rgb(0,0,0)",
+      "font-size" : 10,
+      "color" : "rgb(0,0,0)"
+    }
+  }, {
+    "selector" : "edge[interaction = 'binds']",
+    "css" : {
+      "target-arrow-shape" : "none"
+    }
+  }, {
+    "selector" : "edge[interaction = 'induces']",
+    "css" : {
+      "target-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge[interaction = 'stimulates']",
+    "css" : {
+      "target-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge[interaction = 'produces']",
+    "css" : {
+      "target-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge[interaction = 'inhibits']",
+    "css" : {
+      "target-arrow-shape" : "tee"
+    }
+  }, {
+    "selector" : "edge[interaction = 'phosphorylates']",
+    "css" : {
+      "target-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge[interaction = 'activates']",
+    "css" : {
+      "target-arrow-shape" : "triangle"
+    }
+  }, {
+    "selector" : "edge:selected",
+    "css" : {
+      "line-color" : "rgb(255,0,0)"
+    }
+  } ]
+} ]
