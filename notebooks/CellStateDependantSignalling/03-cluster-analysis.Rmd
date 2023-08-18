@@ -1,0 +1,635 @@
+---
+title: "Interactions term analysis"
+author: "Evert Bosdriesz"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    df_print: paged
+    code_folding: hide
+editor_options:
+  markdown:
+    wrap: sentence
+bibliography: references.bib
+---
+
+## Background
+
+Single cells were clustered into 9 clusters based on the expression of proteins that were not differentially expressed between drug treatments.
+These clusters appear to have some relation to cell-state.
+And interesting question is if some phospho-protein responses are cluster dependent, as this would suggest a cell-state dependent drug response that is potentially relevant to drug resistance.
+
+In this notebook we systematically explore this.
+To this end, we regress the expression of each antibody in each cell to the drug-treatment and cellstate cluster, and include an interaction term, i.e. we fit the following model for each antibody.
+
+$$expression_{i,x} ~ \beta_0 + \beta_{t}*treatment + \beta_{c}*cellstate + \beta_{i}*treatment * cellstate$$
+
+Antibodies for which there are significant interaction term show signs of cell-state dependent drug response.
+
+We will use the z-score normalized data as input because this allows for visualization of all antibodies on the same scale.
+Note that this does not the p-values for significance of the interaction term (which is shown at the end of the notebook).
+
+```{r knitr_init, echo=FALSE, cache=FALSE, message=FALSE}
+library(knitr)
+library(rmdformats)
+library(tidyverse)
+library(tidymodels)
+library(here)
+
+source(here("src", "graphics-options.R"))
+ 
+## Global options
+options(max.print = "80")
+opts_chunk$set(
+  echo = TRUE, cache = FALSE, prompt = FALSE, tidy = FALSE, comment = NA,
+  message = FALSE, warning = FALSE
+)
+opts_knit$set(width = 80)
+```
+
+Our input data looks as follows:
+
+```{r load_data}
+dat_tmm <- read_tsv(here("data", "processed", "scIDseq-vanEijl-tmm.tsv")) %>% 
+  select(sample_id, treatment, ab_name, ab_type, ab_count_tmm) %>% 
+  filter(treatment != "No_EGF") %>% 
+  mutate(treatment = factor(treatment, levels = c("EGF", "ip70S6K_EGF", "iRSK_EGF")))
+
+
+dat_zscore <- read_csv(
+  here("data", "processed" ,"TMM_normalised_z_transformed_concencus_clusters.csv")
+  ) %>% 
+  select(-...1, -plate_number, -treatment) %>% 
+  mutate(cluster = as_factor(cluster)) %>% 
+  pivot_longer(!c(cluster, sample_id), names_to = "ab_name", values_to = "zscore")
+
+
+dat <- left_join(dat_tmm, dat_zscore)
+
+rm(dat_tmm, dat_zscore)
+head(dat)
+length(unique(dat$sample_id))
+```
+
+```{r plotting functions}
+plot_ab <- function(ab) {
+  ggplot(
+    filter(dat, ab_name == ab),
+    aes(x = cluster, y = zscore, fill = treatment)
+  ) +
+    geom_boxplot() +
+    #ggbeeswarm::geom_beeswarm() +
+    #expand_limits(y = 0) +
+    my_theme +
+    scale_fill_manual(values = col_lst) +
+    labs(title = ab, x = "Cell state cluster", y = "z-score normalized ab-expression")
+}
+
+plot_ab("MAPK_APK2_P") + 
+  theme(legend.position = "none") +
+  presentation_theme +
+  labs(title = "MK2") 
+  
+```
+
+```{r fig.width=3, fig.height=5, eval=FALSE}
+plot_ab_nocluster <- function(ab) {
+  ggplot(
+    filter(dat, ab_name == ab),
+    aes(x = treatment, y = zscore, color = treatment)
+  ) +
+    geom_boxplot() +
+    ggbeeswarm::geom_beeswarm() +
+    #expand_limits(y = 0) +
+    presentation_theme +
+    scale_color_manual(values = col_lst) +
+    scale_x_discrete(labels = tx_labs) +
+    labs(title = ab, x = "Treatment", y = "Z-Score normalized ab-expression",
+         ) +
+    theme(legend.position = "none")
+}
+
+plot_ab_nocluster("ERK1_2_P") + labs(title = "ERK1/2-p")
+plot_ab_nocluster("RIBOSOMAL_S6_P") + labs(title = "RPS6-p")
+plot_ab_nocluster("RSK1_P_T359") + labs(title = "p90-RSK-p")
+plot_ab_nocluster("AKT1_P") + labs(title = "AKT1-p")
+```
+
+## Analysis
+
+### Data exploration
+
+Let's first briefly explore the clusters.
+How many cells are there in each cluster, and which treatment did they receive?
+
+```{r inspect_clusters}
+dat %>% 
+  ungroup() %>% 
+  select(sample_id, treatment, cluster) %>% 
+  group_by(treatment, cluster) %>% 
+  distinct() %>% 
+  summarise(N = n()) %>% 
+  pivot_wider(names_from = treatment, values_from = N) %>%
+  mutate(total = EGF + ip70S6K_EGF + iRSK_EGF)
+```
+
+Or visually.
+
+```{r plot_clusters}
+dat %>% 
+  select(sample_id, treatment, cluster) %>% 
+  distinct() %>% 
+  ggplot(aes(x = cluster, fill = treatment)) +
+  geom_bar() +
+  scale_fill_manual(values = col_lst) +
+  my_theme
+```
+
+We expect the treatments to be balanced over the clusters, as the duration of the treatment is too short to affect the cell state.
+This seems to be reasonably the case, but a formal enrichment analysis might be useful here.
+
+### Model fitting
+
+Now let's fit our model with interaction term.
+In addition, we obtain the "fit" for each treatment-cluster combination and the corresponding the 95% confidence interval.
+For comparison, we'll also fit a model without an interaction term.
+
+As reference levels, we select EGF only treatment and cluster 1.
+Later we'll explore the effect of using different clusters as reference.
+
+```{r fit_models}
+get_fit <- function(ab, df, formula){
+  lm(formula, filter(df, ab_name == ab))
+}
+
+
+formula_simple <- zscore ~  0 + cluster + treatment
+formula_interaction <- zscore ~ 0 + cluster * treatment
+
+ab_name_lst <- as.list(unique(dat$ab_name))
+names(ab_name_lst) <- ab_name_lst
+
+fit_lst_simple <- purrr::map(ab_name_lst, get_fit, dat, formula_simple)
+fit_lst_interaction <- purrr::map(ab_name_lst, get_fit, dat, formula_interaction)
+
+model_simple <- 
+  purrr::map(fit_lst_simple, tidy) %>% 
+  bind_rows(.id = "ab_name") %>% 
+  mutate(fdr = p.adjust(p.value, method = "BH")) %>% 
+  mutate(term_type = case_when(
+    str_detect(term, ":") ~ "interaction",
+    str_detect(term, "(Intercept)") ~ "intercept",
+    str_detect(term, "treatment") ~ "treatment",
+    TRUE ~ "cluster"
+  )) 
+
+model_interaction <- 
+  purrr::map(fit_lst_interaction, tidy) %>% 
+  bind_rows(.id = "ab_name") %>% 
+  mutate(fdr = p.adjust(p.value, method = "BH")) %>% 
+  mutate(term_type = case_when(
+    str_detect(term, ":") ~ "interaction",
+    str_detect(term, "(Intercept)") ~ "intercept",
+    str_detect(term, "treatment") ~ "treatment",
+    TRUE ~ "cluster"
+  )) 
+
+write_tsv(model_simple, here("results", "model-exp-lm"))
+write_tsv(model_interaction, here("results", "model-exp-interaction.tsv"))
+```
+
+### Two-way Anova
+
+We'll first perform a two-way ANOVA as this is the simplest to interpret.
+This will give us significance levels per antibody, but not for individual interactions terms.
+The following antibodies have a significant interaction term (which means that the zscores can be significantly better described by a model with an interaction term compared to one without.)
+
+```{r model_anova}
+model_anova <- purrr::map(
+  ab_name_lst,
+  function(x){tidy(aov(zscore ~ treatment * cluster, data = filter(dat, ab_name == x)))}
+  ) %>% 
+  bind_rows(.id = "ab_name")  
+
+signif_interactions_anova <- 
+  model_anova %>% 
+  filter(term == "treatment:cluster") %>% 
+  mutate(fdr = p.adjust(p.value, method = "BH")) %>% 
+  arrange(fdr) %>% 
+  filter(fdr < 0.05) 
+  
+select(signif_interactions_anova, ab_name, statistic, p.value, fdr)
+
+write_tsv(signif_interactions_anova, here("results",  "treatment_cellstate_interactions_anova.tsv"))
+```
+
+### Regression with interaction term
+
+To get p-values for each individual interaction term we .
+
+Note that the final model is mathematically equivalent to the two-way ANOVA in that model predictions/fits are identical.
+Let's consider the significant interactions.
+A table with all significant interactions is written to results/scIDseq/treatment_cellstate_interactions.tsv, and a table with all coefficients of the linear and interaction model to results/scIDseq/model-exp-lm.tsv and results/scIDseq/model-exp-interaction.tsv, respectively.
+
+```{r signif_interactions}
+signif_interactions <-
+  model_interaction %>% 
+  filter(term_type == "interaction" & p.value < 0.05) %>%
+  arrange(fdr) %>% 
+  separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>% 
+  mutate(
+    treatment = stringr::str_replace(treatment, "treatment", ""),
+    cluster = stringr::str_replace(cluster, "cluster", "")
+  )  
+
+write_tsv(signif_interactions, here("results", "treatment_cellstate_interactions.tsv"))
+```
+
+```{r}
+filter(signif_interactions, cluster == "5")
+```
+
+There are `r nrow(signif)` significant interactions.
+What are the stongest ones?
+
+```{r}
+head(signif_interactions, n = 10)
+```
+
+Cluster 9 seems to show the most.
+Indeed, most are between p70S6K inhibition and cluster 9.
+
+```{r}
+group_by(signif_interactions, cluster, treatment) %>% 
+  summarise(N = n()) %>% 
+  arrange(desc(N))
+```
+
+However, it should be noted that this is based on just 13 cells.
+
+```{r}
+model_interaction %>% 
+  filter(term_type == "treatment" & p.value < 0.05) %>%
+  arrange(fdr)
+```
+
+## Visualizations
+
+```{r predictions}
+prediction_input <- distinct(select(dat, treatment, cluster)) %>% 
+  arrange(cluster, treatment)
+
+get_predictions <- function(fit){
+  bind_cols(
+    prediction_input,
+    as_tibble(predict(fit, prediction_input, interval = "confidence")))
+}
+
+predictions_interaction <- 
+  fit_lst_interaction %>% 
+  purrr::map(get_predictions) %>% 
+  bind_rows(.id = "ab_name")
+
+predictions_simple <- 
+  fit_lst_simple %>% 
+  purrr::map(get_predictions) %>% 
+  bind_rows(.id = "ab_name")
+
+
+predictions <- bind_rows(list(
+  "interaction" = predictions_interaction,
+  "simple" = predictions_simple),
+  .id = "model_type"
+  ) 
+rm(predictions_interaction, predictions_simple, prediction_input)
+```
+
+Let's visualize the expression patterns of some potentially interesting antibodies.
+In the plots below the model predictions for each treatment-cluster pair are indicated.
+For comparison, the gray points indicate the estimates using a model without an interaction term.
+
+```{r plot_prediction}
+plot_prediction <- function(ab){
+  ggplot(filter(predictions, ab_name == ab & model_type == "interaction"), 
+    aes(y = fit, x = cluster, color = treatment, group=treatment)) +
+    geom_point(
+      data = filter(predictions, ab_name == ab & model_type == "simple"),
+      color = "lightgray", size = 4, position = position_dodge(width = 0.5)) +
+    geom_errorbar(
+      data = filter(predictions, ab_name == ab & model_type == "simple"),
+      aes(y = fit, ymin = lwr, ymax = upr, group = treatment),
+      width = .5, position = position_dodge(width = 0.5), color = "lightgray"
+    ) +
+    geom_point(size = 4, position = position_dodge(width = 0.5)) +
+    geom_errorbar(
+      aes(y = fit, ymin = lwr, ymax = upr, color = treatment),
+      width = .5, position = position_dodge(width = 0.5)
+    ) +
+  scale_color_manual(values = col_lst) + 
+  labs(title = ab, x = "Cell state cluster", y = "z-score (Model estimate)") +
+  my_theme
+}
+```
+
+### RSKi treatment and Cluster 5
+
+Cluster 5 has high expression of both H3_P and CYCLIN_B1 (and to a lesser extend, H2A_P), which is affected by RSKi.
+For H3_P and H2A_P the upregulation in cluster 5 is repressed, whereas for CYCLIN_B1 it is extra pronounced
+
+```{r}
+plot_prediction("H3_P")
+plot_ab("H3_P")
+plot_prediction("H2A_P")
+plot_prediction("CYCLIN_B1")
+```
+
+### p70i treatment and cluster 9
+
+A large number of antibodies show a similar trend, where they are upregulated upon p70S6K inhibition in cluster 9.
+These include CYCLIN_E, FAK, SCR_P, JAK1_P, STAT5_P, and phospho-NFkB/p65 all show a SRC_P also shows this trent in cluster 6.
+Surprisingly, AKT2 also shows this profile, since the response of a total protein is not expected on the timescale of the inhibitor treatment (2 hours?)
+
+```{r}
+plot_prediction("CYCLIN_E")
+plot_prediction("FAK")
+plot_prediction("SRC_P")
+plot_prediction("JAK1_P")
+plot_prediction("STAT5_P")
+plot_prediction("EGFR_P_Y1045")
+plot_prediction("AKT2")
+```
+
+### Other interesting antibodies
+
+Finally, RIBOSOMAL_S6_P also has a significant interaction term, which is not so easy to pin to one cluster.
+In clusters 2, it is unexpectedly unresponsive to p70 inhbition, whereas in cluster 6 it is unresponsive to RSK inhibition.
+
+```{r}
+plot_prediction("RIBOSOMAL_S6_P")
+```
+
+```{r plot_all, echo=FALSE, message=FALSE, warning=FALSE, eval=FALSE}
+ab_list <- sort(unique(predictions$ab_name))
+
+save_plot <- function(ab){
+  ggsave(
+    here("figures", "scIDseq", "expression-profiles", str_c(ab, "_expression.pdf")),
+    plot_ab(ab),
+    width = 6, height = 4
+    )
+}
+
+save_plot_model <- function(ab){
+  ggsave(
+    here("figures", "scIDseq", "expression-profiles", str_c(ab, "_model.pdf")),
+    plot_prediction(ab),
+    width = 6, height = 4
+    )
+}
+
+# purrr::map(ab_list, save_plot)
+# purrr::map(ab_list, save_plot_model)
+```
+
+### Overview of all term
+
+We'll also create an overview of all interaction terms.
+Signifance is indicated by a black circle around the dot.
+
+```{r}
+ordered_ab_lst <- read_csv(
+  here("data", "for-visualization", "ordered_antibody_list.csv"), 
+   col_names = FALSE)$X1
+
+hc_treats <- filter(model_interaction, term_type == "interaction") %>% 
+  separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>% 
+  mutate(log10p = -log10(p.value)) %>% 
+  select(ab_name, term, log10p) %>% 
+  pivot_wider(names_from = term, values_from = log10p) %>% 
+  column_to_rownames("ab_name") %>% 
+  #as.matrix %>% 
+  dist() %>% 
+  hclust()
+
+plt <- model_interaction %>% 
+  filter(term_type == "interaction") %>%
+  mutate(significant = p.value < 0.05) %>%
+  separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>%
+  mutate(
+    treatment = stringr::str_replace(treatment, "treatment", ""),
+    cluster = stringr::str_replace(cluster, "cluster", "")
+  )  %>% 
+  mutate(
+    ab_name = factor(ab_name, levels = ordered_ab_lst)
+    ) %>%
+  ggplot(aes(x = ab_name, y = cluster)) +
+  geom_point(aes(size = -log10(p.value), fill = estimate, color = significant), shape = 21) +
+  scale_size(range = c(0,5)) +
+  scale_color_manual(breaks = c(TRUE, FALSE), values = c("black", "white")) +
+  colorspace::scale_fill_continuous_diverging("Blue-Red 2") +
+  cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "", y = "Cell state") +
+  guides(color = FALSE) +
+  facet_wrap(~treatment, nrow = 2)
+plt
+ggsave(here("figures",  "interaction-terms-ref=C1.pdf"), plt, width = 10, height = 4)
+```
+
+## Using different reference clusters
+
+The plot above does not show any interaction terms for cluster 1 because we used cluster 1 as the reference in the plot above.
+However, this is a somewhat arbitrary choice.
+Inspection of some of the individual antibodies showed interesting interactions in Clusters, 2, 5, 6, and 9, so we don't want to use these as reference.
+
+One way to select a reference cluster is to use the most "average" one.
+A rough way to determine this is looking at the mean of the absolute z-scores of all antibodies.
+
+```{r mean zscore per cluster}
+dat %>% 
+  group_by(cluster) %>% 
+  summarise(
+    mean_zscore_abs = mean(abs(zscore)),
+    mean_zscore_sq = mean(zscore*zscore)
+    ) %>% 
+  arrange(mean_zscore_sq)
+```
+
+This would suggest using cluster 3 as a reference.
+
+```{r ref3}
+dat_ref3 <- mutate(dat, cluster = forcats::fct_relevel(cluster, "3"))
+fit_lst_zscore_ref3 <- purrr::map(ab_name_lst, get_fit, dat_ref3, formula_interaction)
+
+model_ref3 <-
+  purrr::map(fit_lst_zscore_ref3, function(x) broom::tidy(x)) %>%
+  bind_rows(.id = "ab_name") %>%
+  mutate(fdr = p.adjust(p.value, method = "BH")) %>%
+  mutate(term_type = case_when(
+    str_detect(term, ":") ~ "interaction",
+    str_detect(term, "(Intercept)") ~ "intercept",
+    str_detect(term, "treatment") ~ "treatment",
+    TRUE ~ "cluster"
+  ))
+
+signif_interactions_ref3 <-
+  model_ref3 %>%
+  filter(term_type == "interaction" & p.value < 0.05) %>%
+  arrange(fdr) %>%
+  separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>%
+  mutate(
+    treatment = stringr::str_replace(treatment, "treatment", ""),
+    cluster = stringr::str_replace(cluster, "cluster", "")
+  )
+
+plt <- 
+  model_ref3 %>%
+  filter(term_type == "interaction") %>%
+  mutate(significant = p.value < 0.05) %>%
+  separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>%
+  mutate(
+    treatment = stringr::str_replace(treatment, "treatment", ""),
+    cluster = stringr::str_replace(cluster, "cluster", "")
+  )  %>%
+  mutate(ab_name = factor(ab_name, levels = ordered_ab_lst)) %>% 
+  # mutate(cluster = factor(cluster, levels = hc_clust$labels[hc_clust$order])) %>% 
+  ggplot(aes(x = ab_name, y = cluster)) +  
+  geom_point(aes(size = -log10(p.value), fill = estimate, color = significant), shape = 21) +
+  scale_size(range = c(0,5)) +
+  scale_color_manual(breaks = c(TRUE, FALSE), values = c("black", "white")) +
+  colorspace::scale_fill_continuous_diverging("Blue-Red 2") +
+  cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "", y = "Cell state") +
+  guides(color = FALSE) +
+  facet_wrap(~treatment, nrow = 2)
+plt
+ggsave(here("figures",  "interaction-terms-ref=C3.pdf"), plt, width = 10, height = 4)
+```
+
+Of note, when using cluster 3 as reference, the interaction terms relating to RPS6 are no longer significant.
+(When using cluster 1 also not after multiple testing correction).
+
+How much difference does the reference cluster make?
+Let's look at the correlation between estimate effect sizes for the interaction term using Cluster 1 and cluster 3 as reference.
+
+```{r}
+tmp <- filter(model_interaction, term_type == "interaction") %>% 
+  full_join(
+    filter(model_ref3, term_type == "interaction"), 
+    by = c("ab_name", "term"), suffix = c(".ref1", ".ref3")
+    ) %>% 
+  separate(term, into = c("cluster", "treatement"), sep = ":")
+
+
+ggplot(tmp, aes(x = estimate.ref1, y=estimate.ref3)) +
+  geom_point() +
+  my_theme +
+  labs(
+    x = "Cluster 1 as reference", y = "Cluster 3 as reference",
+    title = "Effect sizes of interaction term"
+    )
+```
+
+The plot above shows that these are highly correlated.
+
+## Using altenative inputs
+
+We have used the TMM normalized data to perform the interaction term analysis.
+Here we just check that using the TMM-data gives identical p-values for the two-way anova and the regression model.
+
+```{r using tmm data}
+formula_tmm <- ab_count_tmm ~ cluster * treatment
+fit_lst_tmm <- purrr::map(ab_name_lst, get_fit, dat, formula_tmm)
+
+model_tmm <-
+  purrr::map(fit_lst_tmm, function(x) broom::tidy(x)) %>%
+  bind_rows(.id = "ab_name") %>%
+  mutate(fdr = p.adjust(p.value, method = "BH")) %>%
+  mutate(term_type = case_when(
+    str_detect(term, ":") ~ "interaction",
+    str_detect(term, "(Intercept)") ~ "intercept",
+    str_detect(term, "treatment") ~ "treatment",
+    TRUE ~ "cluster"
+  ))
+
+signif_interactions_tmm <-
+  model_tmm %>%
+  filter(term_type == "interaction" & p.value < 0.05) %>%
+  arrange(fdr) %>%
+  separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>%
+  mutate(
+    treatment = stringr::str_replace(treatment, "treatment", ""),
+    cluster = stringr::str_replace(cluster, "cluster", "")
+  )
+
+sum(signif_interactions_tmm$p.value - signif_interactions$p.value > 1e-3)
+rm()
+```
+
+```{r}
+plot_correlation <- function(df, ab1, ab2, c, count_col = 'zscore'){
+  df %>%
+    select(sample_id, ab_name, treatment, cluster, !!sym(count_col)) %>%
+    pivot_wider(
+      names_from = ab_name,
+      values_from = !!sym(count_col)
+    ) %>% 
+    mutate(in_cluster = if_else(cluster == c, TRUE, FALSE)) %>% 
+    ggplot(aes(x = !!sym(ab1), y = !!sym(ab2), col = in_cluster)) +
+    geom_point() +
+    facet_wrap(~treatment) +
+    labs(x = ab1, y = ab2, title = str_c("Cluster ", c), subtitle = count_col) +
+    geom_smooth(method = "lm") +
+    scale_color_manual(values = c("gray", "red"), name = str_c("In cluster ", c))
+}
+
+plot_correlation(dat,"MAPK_APK2_P",  "CYCLIN_B1", "5") 
+plot_correlation(dat,"MAPK_APK2_P",  "CYCLIN_B1", "9") 
+# plot_correlation(dat,"MAPK_APK2_P",  "CYCLIN_B1", "2") 
+plot_correlation(dat,"MKK3_6_P",  "CYCLIN_B1", "5") 
+
+plot_correlation(dat, "RB_P", "H2A_P", "5") 
+# plot_correlation(dat, "EGFR_P_Y1045", "ERK1_2_P")
+```
+
+```{r}
+plot_correlation <- function(df, ab1, ab2, c, count_col = 'zscore'){
+  df %>%
+    select(sample_id, ab_name, treatment, cluster, !!sym(count_col)) %>%
+    pivot_wider(
+      names_from = ab_name,
+      values_from = !!sym(count_col)
+    ) %>% 
+    mutate(in_cluster = if_else(cluster == c, TRUE, FALSE)) %>% 
+    ggplot(aes(x = !!sym(ab1), y = !!sym(ab2))) +
+    geom_point(aes(col = treatment)) +
+    facet_wrap(~in_cluster) +
+    labs(x = ab1, y = ab2, title = str_c("Cluster ", c), subtitle = count_col) +
+    geom_smooth(method = "lm") +
+    presentation_theme +
+    theme_light() +
+    scale_color_manual(values = col_lst)
+}
+
+plot_correlation(dat,"MAPK_APK2_P",  "CYCLIN_B1", "5") +
+  labs(x = "MK2", y = "Cyclin B1") +
+  theme(legend.position = "none")# + facet_wrap(~treatment, ncol=1)
+
+```
+
+```{r fig.height=3, fig.width=2}
+plot_correlation(dat,"MAPK_APK2_P",  "CYCLIN_B1", "5") + facet_wrap(~treatment, ncol=1)
+#plot_correlation(dat, "CJUN_P", "MAPK_APK2_P")  + facet_wrap(~treatment, scales = "free")
+
+```
+
+```{r fig.height=3, fig.width=2}
+plot_correlation(dat, "ERK1_2_P", "MAPK_APK2_P", "5") + facet_wrap(~treatment, ncol=1)
+
+```
+
+## Session info
+
+```{r sessioninfo}
+sessioninfo::session_info()
+```

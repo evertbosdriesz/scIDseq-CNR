@@ -1,0 +1,366 @@
+---
+title: "Predicting cell state from signaling activity"
+author: "Evert Bosdriesz"
+toc: true
+format:
+  html:
+    html-math-method: katex
+    code-fold: true
+    self-contained: true
+    df-print: paged
+execute:
+  warning: false
+---
+
+## Background
+
+
+Cell state markers are defined as antibodies that show no differential expression upon either treatment.
+We've clustered cells based on cell state markers. 
+A heatmap of the resulting clustering indicates that the signaling markers, which were not used in determining the clusters, nonetheless showed clear cell state specific expression patterns. 
+This raises the question to which extend cell state information is present in the signaling state. 
+To study this question, we will train cell state classifiers using the signaling state markers as features. 
+We assess the performance of the classifiers using 5-fold cross-validation.
+
+## Loading and exploring the data
+
+```{r init, echo=FALSE, cache=FALSE, message=FALSE}
+library(tidyverse)
+library(here)
+library(glmnet)
+library(tidymodels)
+library(dotwhisker)
+
+source(here("src", "graphics-options.R"))
+ 
+## Global options
+options(max.print = "80")
+```
+
+
+```{r load-data-and-annotations}
+dat_zscore <- read_csv(
+  here("data", "processed" ,"TMM_normalised_z_transformed_concencus_clusters.csv"),
+  show_col_types = FALSE) |> 
+  select(-...1, -plate_number) |> # Keep treatment and sample ID
+  mutate(
+    cluster = as_factor(cluster),
+    treatment = as_factor(treatment)) 
+
+cell_state_markers <- read_lines(here("data", "annotations", "cell_state_markers.txt"))
+signaling_state_markers <- read_lines(here("data", "annotations", "signalling_state_markers.txt"))
+```
+
+
+## Training the model
+
+We will train two types of models. 
+Predicting the cell state from the cell state markers (as a positive control) and predicting it from the signaling state markers **that were not used in defining the cell state*.
+
+```{r dat_sigstate}
+dat_cellstate <- select(dat_zscore, all_of(c("cluster", "sample_id", 
+                                             "treatment", cell_state_markers)))
+dat_sigstate <- select(dat_zscore, all_of(c("cluster", "sample_id", 
+                                            "treatment", signaling_state_markers)))
+```
+
+We will use
+
+  * Multinomal logistic regression
+  * Random forrest
+
+for now.
+
+### Random forest
+
+We will not tune the hyperparameters of the random forest model.
+Therefore, model performance will be assessed using regular 5-fold cross validation.
+
+Using this scheme, we find an accuracy of 0.52 and an ROC AUC of 0.88.
+
+```{r rf-sigstate}
+rf_mod <- 
+  rand_forest(trees = 1000) |> 
+  set_engine("ranger") |> 
+  set_mode("classification")
+
+sigstate_rec <- 
+  recipe(cluster ~ ., data = dat_sigstate) |> 
+  update_role(sample_id, treatment, new_role = "ID")
+
+sigstate_folds <- vfold_cv(dat_sigstate, v = 5, strata = cluster)
+
+rf_sigstate_wf <-
+  workflow() |> 
+  add_model(rf_mod) |>
+  add_recipe(sigstate_rec) 
+
+rf_sigstate_fit <- 
+  rf_sigstate_wf |> 
+  fit_resamples(sigstate_folds)
+
+collect_metrics(rf_sigstate_fit)
+```
+
+As a comparison; How well can we predict the cell state from the cell state markers?
+As expected, quite well.
+
+```{r rf-cellstate}
+cellstate_rec <- 
+  recipe(cluster ~ ., data = dat_cellstate) |> 
+  update_role(sample_id, treatment, new_role = "ID")
+
+cellstate_folds <- vfold_cv(dat_cellstate, v = 5, strata = cluster)
+
+rf_cellstate_wf <-
+  workflow() |> 
+  add_model(rf_mod) |>
+  add_recipe(cellstate_rec) 
+
+rf_cellstate_fit <- 
+  rf_cellstate_wf |> 
+  fit_resamples(cellstate_folds)
+
+collect_metrics(rf_cellstate_fit) |> 
+  select(-n, -.config)
+```
+
+These results seem consistent with Klaas' analysis.
+
+### Multinomial logistic regression
+
+For Multinomial logistic regression we will tune the penalty parameter (lamda), so ideally we should use nested cross validation. 
+However, let's first get an impression by simply splitting the data in a train and test set.
+
+
+```{r preprocess}
+set.seed(29)
+sigstate_split <- initial_split(dat_sigstate,
+                                strata = cluster,
+                                prop = 2./3)
+
+sigstate_train <- training(sigstate_split)
+sigstate_test  <- testing(sigstate_split)
+sigstate_cv   <- vfold_cv(sigstate_train, folds = 5, strata = cluster) 
+
+sigstate_rec <- 
+  recipe(cluster ~ ., data = sigstate_train) |> 
+  update_role(sample_id, treatment, new_role = "ID")
+
+# mlr_sigstate_mod <- 
+#   multinom_reg(mode)
+#   rand_forest(trees = 1000) %>% 
+#   set_engine("ranger") %>% 
+#   set_mode("classification")
+```
+
+
+```{r model}
+mlr_mod <- 
+  multinom_reg(penalty = tune(), mixture = 0.5) |> 
+  set_engine("glmnet")
+
+mlr_sigstate_wf <- 
+  workflow() |> 
+  add_recipe(sigstate_rec) |> 
+  add_model(mlr_mod)
+
+res <- 
+  mlr_sigstate_wf |> 
+  tune_grid(resamples = sigstate_cv,
+            grid = 10)
+
+best_param <- 
+  res |> 
+  select_best(metric = "accuracy")
+```
+
+This way, we obtain an accuray around 0.5.
+
+```{r validate}
+mlr_fit <- 
+  mlr_sigstate_wf |> 
+  finalize_workflow(best_param) |> 
+  fit(data = sigstate_train)
+
+mlr_fit |>  
+  predict(new_data = sigstate_test) |> 
+  bind_cols(sigstate_test) |> 
+  yardstick::accuracy(truth = cluster, estimate = .pred_class)
+
+
+```
+ROC curves and confusion matrices look as follows.
+
+```{r}
+sigstate_aug <- augment(mlr_fit, sigstate_test)
+
+sigstate_aug |> 
+  roc_curve(truth = cluster, .pred_1, .pred_2, .pred_3, .pred_4, .pred_5, .pred_6, .pred_7, .pred_8, .pred_9) |>
+  autoplot()
+```
+
+```{r}
+sigstate_aug |> 
+  conf_mat(truth = cluster, estimate = .pred_class) |> 
+  autoplot(type = "heatmap")
+```
+
+
+<!-- ```{r mlr} -->
+<!-- folds <- nested_cv(dat_cellstate,  -->
+<!--                      outside = vfold_cv(repeats = 5, strata = cluster),  -->
+<!--                      inside = vfold_cv(repeats = 5, strata = cluster)) -->
+<!-- folds -->
+
+
+<!-- tune_spec <- multinom_reg(engine = "glmnet", penalty = tune(), mixture = 0.5) -->
+<!-- tune_spec -->
+
+
+
+
+<!-- sigstate_wflow <- -->
+<!--   workflow() |> -->
+<!--   add_model(mlr_mod) |> -->
+<!--   add_recipe(sigstate_rec) -->
+
+<!-- sigstate_fit <- -->
+<!--   sigstate_wflow |> -->
+<!--   fit(data = train_data) -->
+
+
+<!-- sigstate_fit |> -->
+<!--   extract_fit_parsnip() |> -->
+<!--   tidy() -->
+
+<!-- sigstate_aug <- -->
+<!--   augment(sigstate_fit, test_data) -->
+
+<!-- sigstate_aug |> -->
+<!--   select(cluster, .pred_class) -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+<!-- sigstate_aug |>  -->
+<!--   roc_curve(truth = cluster, .pred_1, .pred_2, .pred_3, .pred_4, .pred_5, .pred_6, .pred_7, .pred_8, .pred_9) |>  -->
+<!--   autoplot() -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- sigstate_aug |>  -->
+<!--   conf_mat(truth = cluster, estimate = .pred_class) |>  -->
+<!--   autoplot(type = "heatmap") -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- set.seed(29) -->
+
+
+<!-- sigstate_rf_fit <- -->
+<!--   rf_mod |>  -->
+<!--   fit(cluster ~ ., data = select(train_data, -sample_id, - treatment)) -->
+
+<!-- sigstate_rf_training_pred <- -->
+<!--   predict(sigstate_rf_fit, train_data) |>  -->
+<!--   bind_cols(predict(sigstate_rf_fit, train_data, type = "prob")) |>  -->
+<!--   bind_cols(select(train_data, cluster)) -->
+
+<!-- sigstate_rf_training_pred |>  -->
+<!--   accuracy(truth = cluster, .pred_class) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- rf_sigstate_testing_pred <-  -->
+<!--   predict(rf_fit, test_data) |>  -->
+<!--   bind_cols(predict(sigstate_rf_fit, test_data, type = "prob")) |>  -->
+<!--   bind_cols(select(test_data, cluster)) -->
+
+<!-- rf_sigstate_testing_pred |>  -->
+<!--   accuracy(truth = cluster, .pred_class) -->
+
+<!-- rf_sigstate_testing_pred |>  -->
+<!--   roc_auc(truth = cluster) -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- sigstate_aug <-  -->
+<!--   augment(sigstate_rf_fit, test_data) -->
+
+<!-- sigstate_aug |>  -->
+<!--   select(cluster, .pred_class) -->
+<!-- ``` -->
+
+
+
+<!-- ```{r} -->
+
+<!-- sigstate_rf_fit |> -->
+<!--   tidy() -->
+
+<!-- sigstate_aug <-  -->
+<!--   augment(sigstate_rf_fit, test_data) -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- lm_mod <- linear_reg() -->
+
+
+<!-- lm_fit_interaction <-  -->
+<!--   lm_mod |>  -->
+<!--   fit(CYCLIN_B1 ~ MAPK_APK2_P * cluster, data = dat_zscore) -->
+
+<!-- lm_fit_simple <-  -->
+<!--   lm_mod |>  -->
+<!--   fit(CYCLIN_B1 ~ MAPK_APK2_P + cluster, data = dat_zscore) -->
+
+<!-- tidy(lm_fit) -->
+
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- tidy(lm_fit_interaction) %>%  -->
+<!--   dwplot(dot_args = list(size = 2, color = "black"), -->
+<!--          whisker_args = list(color = "black"), -->
+<!--          vline = geom_vline(xintercept = 0, colour = "grey50", linetype = 2)) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+
+
+<!-- new_points <- expand.grid(MAPK_APK2_P = median(filter(dat_zscore, cluster == 2)$MAPK_APK2_P), -->
+<!--                           cluster = as.factor(levels(dat_zscore$cluster))) -->
+
+
+
+<!-- mean_pred <- predict(lm_fit_interaction, new_data = new_points) -->
+<!-- conf_int_pred <- predict(lm_fit_interaction, new_data = new_points, type = "conf_int") -->
+
+<!-- plot_data <-  -->
+<!--   new_points %>%  -->
+<!--   bind_cols(mean_pred) %>%  -->
+<!--   bind_cols(conf_int_pred) -->
+
+<!-- # and plot: -->
+<!-- ggplot(plot_data, aes(x = cluster)) +  -->
+<!--   geom_point(aes(y = .pred)) +  -->
+<!--   geom_errorbar(aes(ymin = .pred_lower,  -->
+<!--                     ymax = .pred_upper), -->
+<!--                 width = .2) +  -->
+<!--   labs(y = "CYCLIN B1") -->
+
+<!-- ``` -->
+
+
+
+
+<!-- ## Evaluating model performance  -->
+
+<!-- ## Conclusion -->
