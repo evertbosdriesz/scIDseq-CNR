@@ -12,8 +12,9 @@ execute:
   warning: false
 ---
 
-## Background
+<!-- ## OVERVIEW -->
 
+## Background
 
 Cell state markers are defined as antibodies that show no differential expression upon either treatment.
 We've clustered cells based on cell state markers. 
@@ -30,6 +31,11 @@ library(here)
 library(glmnet)
 library(tidymodels)
 library(dotwhisker)
+library(ranger)
+library(ggplot2)
+library(furrr)
+library(future.apply)
+plan(multisession)
 
 source(here("src", "graphics-options.R"))
  
@@ -51,6 +57,20 @@ cell_state_markers <- read_lines(here("data", "annotations", "cell_state_markers
 signaling_state_markers <- read_lines(here("data", "annotations", "signalling_state_markers.txt"))
 ```
 
+## Overview of the data
+
+Cluster 2 has most cells (90) and cluster 9 has only 33 cells. Overall most clusters have between 50 and 60 cells.
+```{r data-overview}
+sampleSize <- data.frame(matrix(nrow = 0, ncol = 2))
+colnames(sampleSize) <- c("Cluster", "Size")
+for(i in seq(1:9))
+{
+  sampleSize[nrow(sampleSize) + 1,] = c(i, nrow(dat_zscore[dat_zscore$cluster == i,]))
+}
+knitr::kable(sampleSize)
+```
+
+<!-- ## Evaluating model performance  -->
 
 ## Training the model
 
@@ -68,299 +88,265 @@ We will use
 
   * Multinomal logistic regression
   * Random forrest
+  * Graph Convolutional Neural Network (GCNN) (output generated in python notebook)
 
-for now.
+We are running a 5-fold (inner & outer) nested cross-validation with 5 repeats. For the random forest we trained the hyperparameters mtry, min_n, trees with 3 parameter options for each in the inner fold. For the MLR model we optimized the penalty and model-type (mixture) in a randomly initialized grid with 50 combinations. 
+```{r RF-models, echo=FALSE}
+
+#inspect the model performace when a single parameter changes (to guide, e.g., grid search parameter estimation)
+inspect_single_parameter <- function(parameters, cv_folds, variable)
+{
+  # random forest model: outcome metric accuracy
+  rf_mod <- function(parameter, object) 
+  {
+    #dynamically define model based on parameter input
+    if(variable == "trees"){model_def <- rand_forest(trees = parameter)}
+    else if(variable == "mtry"){model_def <- rand_forest(mtry = parameter)}
+    else if(variable == "min_n"){model_def <- rand_forest(min_n = parameter)}
+    else{print("ERROR: INVALID PARAMETER!")}
+    
+    model <- 
+      model_def %>% 
+      set_engine("ranger") %>% 
+      set_mode("classification")
+    fit <- model %>%
+       fit(cluster ~ ., data = analysis(object))
+    
+    holdout_pred <- 
+      predict(fit, assessment(object) %>% dplyr::select(-cluster)) %>% 
+      bind_cols(assessment(object) %>% dplyr::select(cluster))
+    # add accuracy calculation
+    accuracy <- yardstick::accuracy(holdout_pred, truth = cluster, .pred_class)$.estimate
+  }
+  # call rf model for all hyperparameter values
+  tune_over_parameters <- function(object) 
+  {
+    tibble(parameters = parameters) %>% 
+      mutate(ACCURACY = map_dbl(parameters, rf_mod, object = object))
+  }
+  # summarise the output metrics
+  summarize_tune_results <- function(object) 
+  {
+    # Return row-bound tibble that has the 25 bootstrap results
+    tune_over_parameters(object) %>%
+      # For each value of the tuning parameter, compute the 
+      # average RMSE which is the inner bootstrap estimate. 
+      group_by(parameters) %>%
+      summarize(mean_ACCURACY = mean(ACCURACY, na.rm = TRUE),
+                n = length(ACCURACY),
+                .groups = "drop")
+  }
+  #run final nested cross validation
+  tuning_results <- future_map(cv_folds$splits, summarize_tune_results) 
+  
+  #plot accuracy against parameter values for all folds/ repeats
+  pooled_inner <- tuning_results |>
+    dplyr::bind_rows()
+  best_cost <- function(dat) dat[which.min(dat$mean_ACCURACY),]
+  p <- 
+    ggplot(pooled_inner, aes(x = parameters, y = mean_ACCURACY)) + 
+    scale_x_continuous() +
+    xlab("Parameter Values") + ylab("mean accuracy")
+  for (i in 1:length(tuning_results))
+    p <- p  +
+      geom_line(data = tuning_results[[i]], alpha = .2) +
+      geom_point(data = best_cost(tuning_results[[i]]), pch = 16, alpha = 3/4)
+  p <- p + geom_smooth(data = pooled_inner, se = FALSE)
+  p
+}
+
+#random forest model, tuning min_n, mtry and number of trees
+rf_mod_grid_search <- rand_forest(min_n = tune(), mtry = tune(), trees = tune()) %>% 
+    set_engine("ranger") %>% 
+    set_mode("classification")
+#Multinomial Logistic regression
+mlr_mod <- 
+  multinom_reg(penalty = tune(), mixture = tune()) |> 
+  set_engine("glmnet") |>
+  set_mode("classification")
+
+
+predict_performance_of_outerFold <- function(object, model, data, hyperparams) 
+{
+  #folds
+  innerFold <- object$inner_resamples
+  outerFold <- object$splits
+
+  #use the innerFolds for parameter optimization via grid search
+  rf_rec <- recipe(cluster ~ ., data = data) 
+  rf_wf <-  workflow() |> 
+    add_model(model) |>
+    add_recipe(rf_rec) 
+
+  # fit parameters
+  print("RUNNING GRID SEARCH")
+  spline_res <-
+    tune_grid(rf_wf, resamples = innerFold, grid = hyperparams)
+  #inspect results
+  print(show_best(spline_res, metric = "accuracy"))
+  
+  #final workflow from whole inner fold
+  best_param <- select_best(spline_res,metric = "accuracy")
+  final_wf <- finalize_workflow(rf_wf, best_param)
+  #fit final model to whole inner fold
+  final_res <- final_wf |> 
+    fit(analysis(outerFold))
+  #predict for outer fold
+  final_pre <-  final_res |>
+    predict(new_data = assessment(outerFold)) |> 
+    bind_cols(assessment(outerFold)) 
+  
+  #accuracy
+  accuracy <- final_pre |> 
+    yardstick::accuracy(truth = cluster, estimate = .pred_class)
+  #ROC AUC
+  annotated_probabilities <- augment(final_res, assessment(outerFold))
+  roc_auc <- annotated_probabilities |> 
+    roc_auc(cluster, .pred_1:.pred_9, estimator = "hand_till")
+  roc_curve <- annotated_probabilities |> 
+    roc_curve(cluster, .pred_1:.pred_9) %>%
+    autoplot()
+  #get also confusion matrix
+  conf_m <- final_pre |> 
+    conf_mat(truth = cluster, estimate = .pred_class)
+
+  return(list("accuracy" = accuracy$.estimate, "ROC_AUC" = roc_auc$.estimate, "ROC_CURVE" = roc_curve, "confusion_matrix" = conf_m))
+}
+predict_performance <- function(data, model, hyperparams)
+{
+  # cross validation scheme
+  nested_cellstate_folds <- nested_cv(data, 
+                     outside = vfold_cv(v = 5, repeats = 5, strata = cluster), 
+                     inside = vfold_cv(v = 5, repeats = 1, strata = cluster)) 
+
+  #run final nested cross validation
+  tuning_results <- future_apply(nested_cellstate_folds, 1, predict_performance_of_outerFold, model=model, data = data, hyperparams = hyperparams, future.seed=TRUE) 
+}
+
+visualize_performance <- function(results)
+{
+  accuracy <- list()
+  roc_auc <- list()
+  avg_conf_m <- NULL
+  count <- 0
+  for(i in results)
+  {
+    count <- count + 1
+    accuracy <- append(accuracy, i$accuracy)
+    roc_auc <- append(roc_auc, i$ROC_AUC)
+    if(is.null(avg_conf_m)){avg_conf_m <- broom::tidy(i$confusion_matrix) %>% select(-value)}
+    else
+    {
+      number <- as.character(count)
+      new_conf_m <- broom::tidy(i$confusion_matrix) %>%
+        mutate("val_{number}" := value) %>%
+        select(-value)
+      avg_conf_m <- merge(avg_conf_m, new_conf_m,by="name")
+    }
+  }
+  avg_conf_m <- avg_conf_m %>%
+    mutate(sum = rowSums(across(where(is.numeric)), na.rm=TRUE))
+  avg_conf_m[c('Cell', 'X', 'Y')] <- str_split_fixed(avg_conf_m$name, '_', 3)
+  avg_conf_m <- avg_conf_m %>%
+    select(c(sum, X, Y))
+  
+  print(paste0("The average accuracy is ", as.character(mean(unlist(accuracy)))))
+  print(paste0("The average ROC AUC is ", as.character(mean(unlist(roc_auc)))))
+
+  ggplot(data = avg_conf_m, aes(X, forcats::fct_rev(Y), fill= sum)) + 
+    geom_tile() + geom_text(aes(label=sum)) + 
+      scale_fill_gradient2(low = "white", mid = "white", high = "blue")
+}
+
+```
 
 ### Random forest
 
-We will not tune the hyperparameters of the random forest model.
-Therefore, model performance will be assessed using regular 5-fold cross validation.
+```{r hyperparameter inspection, eval=FALSE}
+#Inspecting accuracy for single parameter changes
 
-Using this scheme, we find an accuracy of 0.52 and an ROC AUC of 0.88.
-
-```{r rf-sigstate}
-rf_mod <- 
-  rand_forest(trees = 1000) |> 
-  set_engine("ranger") |> 
-  set_mode("classification")
-
-sigstate_rec <- 
-  recipe(cluster ~ ., data = dat_sigstate) |> 
-  update_role(sample_id, treatment, new_role = "ID")
-
-sigstate_folds <- vfold_cv(dat_sigstate, v = 5, strata = cluster)
-
-rf_sigstate_wf <-
-  workflow() |> 
-  add_model(rf_mod) |>
-  add_recipe(sigstate_rec) 
-
-rf_sigstate_fit <- 
-  rf_sigstate_wf |> 
-  fit_resamples(sigstate_folds)
-
-collect_metrics(rf_sigstate_fit)
+data_sig <- dat_sigstate %>% select(-c("sample_id", "treatment"))
+fold <- vfold_cv(data_sig, repeats = 5, strata = cluster)
+#INFLUENCE OF MIN_N
+parameters <- c(2, 5, 10, 15, 20)
+inspect_single_parameter(parameters, fold, "min_n")
+#INFLUENCE OF MTRY
+parameters <- c(2, 5, 10, 15, 20)
+inspect_single_parameter(parameters, fold, "mtry")
+#INFLUENCE OF TREE NUMBER
+parameters <- c(50, 100, 500, 1000, 2000, 4000)
+inspect_single_parameter(parameters, fold, "trees")
 ```
 
-As a comparison; How well can we predict the cell state from the cell state markers?
-As expected, quite well.
+As a baseline model we predict the cluster from the cell state markers - which were used to define the clusters; How well can we predict the cell state from the cell state markers? As expected, quite well.
 
-```{r rf-cellstate}
-cellstate_rec <- 
-  recipe(cluster ~ ., data = dat_cellstate) |> 
-  update_role(sample_id, treatment, new_role = "ID")
+This results in in an average accuracy of 83 and ROC AUC of 98 for the baseline model predicting cell state from cell state markers.
+For predicting the cell state from signaling markers we achieve an accuracy of 52 and ROC AUC of 87.
+```{r rf-predictions}
 
-cellstate_folds <- vfold_cv(dat_cellstate, v = 5, strata = cluster)
+#parameters
+hyperparams <- expand.grid(min_n = c(2, 5,10), mtry = c(2, 5,10), trees = c(500, 1000, 2000))
 
-rf_cellstate_wf <-
-  workflow() |> 
-  add_model(rf_mod) |>
-  add_recipe(cellstate_rec) 
+#data_cell <- dat_cellstate %>% select(-c("sample_id", "treatment"))
+#estimates_cellstate_rf <- predict_performance(data_cell, rf_mod_grid_search, hyperparams)
+#save(estimates_cellstate_rf, file = here("data", "cellstate-prediction", "Results_CellState_RF.RData"))
+estimates_cellstate_rf <- get(load(here("data", "cellstate-prediction", "Results_CellState_RF.RData")))
 
-rf_cellstate_fit <- 
-  rf_cellstate_wf |> 
-  fit_resamples(cellstate_folds)
+#data_sig <- dat_sigstate %>% select(-c("sample_id", "treatment"))
+#estimates_sigstate_rf <- predict_performance(data_sig, rf_mod_grid_search, hyperparams)
+#save(estimates_sigstate_rf, file = here("data", "cellstate-prediction", "Results_SigState_RF.RData"))
+estimates_sigstate_rf <- get(load(here("data", "cellstate-prediction", "Results_SigState_RF.RData")))
 
-collect_metrics(rf_cellstate_fit) |> 
-  select(-n, -.config)
+# Visualizations of results
+visualize_performance(estimates_cellstate_rf)
+
+visualize_performance(estimates_sigstate_rf)
+
 ```
+
+Following plots show examplary ROC-CURVES for the 9 differences classes  for the first outer-fold of the baseline (cell state) and signaling state model:
+```{r ROC-CURVES}
+print("Cell State Marker Prediction")
+estimates_cellstate_rf[[1]]$ROC_CURVE
+
+print("Signaling State Marker Prediction")
+estimates_sigstate_rf[[1]]$ROC_CURVE
+
+```
+
 
 These results seem consistent with Klaas' analysis.
 
 ### Multinomial logistic regression
 
-For Multinomial logistic regression we will tune the penalty parameter (lamda), so ideally we should use nested cross validation. 
-However, let's first get an impression by simply splitting the data in a train and test set.
+For Multinomial logistic regression we tune mixture (model type) together with the penalty over a semi-random grid with 50 combinations.
 
-
-```{r preprocess}
-set.seed(29)
-sigstate_split <- initial_split(dat_sigstate,
-                                strata = cluster,
-                                prop = 2./3)
-
-sigstate_train <- training(sigstate_split)
-sigstate_test  <- testing(sigstate_split)
-sigstate_cv   <- vfold_cv(sigstate_train, folds = 5, strata = cluster) 
-
-sigstate_rec <- 
-  recipe(cluster ~ ., data = sigstate_train) |> 
-  update_role(sample_id, treatment, new_role = "ID")
-
-# mlr_sigstate_mod <- 
-#   multinom_reg(mode)
-#   rand_forest(trees = 1000) %>% 
-#   set_engine("ranger") %>% 
-#   set_mode("classification")
-```
-
-
-```{r model}
+```{r MLR-models, echo=FALSE}
 mlr_mod <- 
-  multinom_reg(penalty = tune(), mixture = 0.5) |> 
-  set_engine("glmnet")
-
-mlr_sigstate_wf <- 
-  workflow() |> 
-  add_recipe(sigstate_rec) |> 
-  add_model(mlr_mod)
-
-res <- 
-  mlr_sigstate_wf |> 
-  tune_grid(resamples = sigstate_cv,
-            grid = 10)
-
-best_param <- 
-  res |> 
-  select_best(metric = "accuracy")
-```
-
-This way, we obtain an accuray around 0.5.
-
-```{r validate}
-mlr_fit <- 
-  mlr_sigstate_wf |> 
-  finalize_workflow(best_param) |> 
-  fit(data = sigstate_train)
-
-mlr_fit |>  
-  predict(new_data = sigstate_test) |> 
-  bind_cols(sigstate_test) |> 
-  yardstick::accuracy(truth = cluster, estimate = .pred_class)
-
+  multinom_reg(penalty = tune(), mixture = tune()) |> 
+  set_engine("glmnet") |>
+  set_mode("classification")
 
 ```
-ROC curves and confusion matrices look as follows.
 
-```{r}
-sigstate_aug <- augment(mlr_fit, sigstate_test)
 
-sigstate_aug |> 
-  roc_curve(truth = cluster, .pred_1, .pred_2, .pred_3, .pred_4, .pred_5, .pred_6, .pred_7, .pred_8, .pred_9) |>
-  autoplot()
+```{r MLR-predictions}
+
+#MLR
+hyperparams <- 50
+#data_sig <- dat_sigstate %>% select(-c("sample_id", "treatment"))
+#estimates_sigstate_mlr <- predict_performance(data_sig, mlr_mod, hyperparams)
+#save(estimates_sigstate_mlr, file = here("data", "cellstate-prediction", "Results_SigState_MLR.RData"))
+estimates_sigstate_mlr <- get(load(here("data", "cellstate-prediction", "Results_SigState_MLR.RData")))
+
+visualize_performance(estimates_sigstate_mlr)
+
 ```
 
-```{r}
-sigstate_aug |> 
-  conf_mat(truth = cluster, estimate = .pred_class) |> 
-  autoplot(type = "heatmap")
-```
-
-
-<!-- ```{r mlr} -->
-<!-- folds <- nested_cv(dat_cellstate,  -->
-<!--                      outside = vfold_cv(repeats = 5, strata = cluster),  -->
-<!--                      inside = vfold_cv(repeats = 5, strata = cluster)) -->
-<!-- folds -->
-
-
-<!-- tune_spec <- multinom_reg(engine = "glmnet", penalty = tune(), mixture = 0.5) -->
-<!-- tune_spec -->
+### GCNN
 
 
 
 
-<!-- sigstate_wflow <- -->
-<!--   workflow() |> -->
-<!--   add_model(mlr_mod) |> -->
-<!--   add_recipe(sigstate_rec) -->
-
-<!-- sigstate_fit <- -->
-<!--   sigstate_wflow |> -->
-<!--   fit(data = train_data) -->
-
-
-<!-- sigstate_fit |> -->
-<!--   extract_fit_parsnip() |> -->
-<!--   tidy() -->
-
-<!-- sigstate_aug <- -->
-<!--   augment(sigstate_fit, test_data) -->
-
-<!-- sigstate_aug |> -->
-<!--   select(cluster, .pred_class) -->
-<!-- ``` -->
-
-
-
-<!-- ```{r} -->
-<!-- sigstate_aug |>  -->
-<!--   roc_curve(truth = cluster, .pred_1, .pred_2, .pred_3, .pred_4, .pred_5, .pred_6, .pred_7, .pred_8, .pred_9) |>  -->
-<!--   autoplot() -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-<!-- sigstate_aug |>  -->
-<!--   conf_mat(truth = cluster, estimate = .pred_class) |>  -->
-<!--   autoplot(type = "heatmap") -->
-<!-- ``` -->
-
-
-<!-- ```{r} -->
-<!-- set.seed(29) -->
-
-
-<!-- sigstate_rf_fit <- -->
-<!--   rf_mod |>  -->
-<!--   fit(cluster ~ ., data = select(train_data, -sample_id, - treatment)) -->
-
-<!-- sigstate_rf_training_pred <- -->
-<!--   predict(sigstate_rf_fit, train_data) |>  -->
-<!--   bind_cols(predict(sigstate_rf_fit, train_data, type = "prob")) |>  -->
-<!--   bind_cols(select(train_data, cluster)) -->
-
-<!-- sigstate_rf_training_pred |>  -->
-<!--   accuracy(truth = cluster, .pred_class) -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-
-<!-- ``` -->
-
-
-<!-- ```{r} -->
-<!-- rf_sigstate_testing_pred <-  -->
-<!--   predict(rf_fit, test_data) |>  -->
-<!--   bind_cols(predict(sigstate_rf_fit, test_data, type = "prob")) |>  -->
-<!--   bind_cols(select(test_data, cluster)) -->
-
-<!-- rf_sigstate_testing_pred |>  -->
-<!--   accuracy(truth = cluster, .pred_class) -->
-
-<!-- rf_sigstate_testing_pred |>  -->
-<!--   roc_auc(truth = cluster) -->
-<!-- ``` -->
-<!-- ```{r} -->
-<!-- sigstate_aug <-  -->
-<!--   augment(sigstate_rf_fit, test_data) -->
-
-<!-- sigstate_aug |>  -->
-<!--   select(cluster, .pred_class) -->
-<!-- ``` -->
-
-
-
-<!-- ```{r} -->
-
-<!-- sigstate_rf_fit |> -->
-<!--   tidy() -->
-
-<!-- sigstate_aug <-  -->
-<!--   augment(sigstate_rf_fit, test_data) -->
-<!-- ``` -->
-
-
-<!-- ```{r} -->
-<!-- lm_mod <- linear_reg() -->
-
-
-<!-- lm_fit_interaction <-  -->
-<!--   lm_mod |>  -->
-<!--   fit(CYCLIN_B1 ~ MAPK_APK2_P * cluster, data = dat_zscore) -->
-
-<!-- lm_fit_simple <-  -->
-<!--   lm_mod |>  -->
-<!--   fit(CYCLIN_B1 ~ MAPK_APK2_P + cluster, data = dat_zscore) -->
-
-<!-- tidy(lm_fit) -->
-
-<!-- ``` -->
-<!-- ```{r} -->
-<!-- tidy(lm_fit_interaction) %>%  -->
-<!--   dwplot(dot_args = list(size = 2, color = "black"), -->
-<!--          whisker_args = list(color = "black"), -->
-<!--          vline = geom_vline(xintercept = 0, colour = "grey50", linetype = 2)) -->
-<!-- ``` -->
-
-<!-- ```{r} -->
-
-
-<!-- new_points <- expand.grid(MAPK_APK2_P = median(filter(dat_zscore, cluster == 2)$MAPK_APK2_P), -->
-<!--                           cluster = as.factor(levels(dat_zscore$cluster))) -->
-
-
-
-<!-- mean_pred <- predict(lm_fit_interaction, new_data = new_points) -->
-<!-- conf_int_pred <- predict(lm_fit_interaction, new_data = new_points, type = "conf_int") -->
-
-<!-- plot_data <-  -->
-<!--   new_points %>%  -->
-<!--   bind_cols(mean_pred) %>%  -->
-<!--   bind_cols(conf_int_pred) -->
-
-<!-- # and plot: -->
-<!-- ggplot(plot_data, aes(x = cluster)) +  -->
-<!--   geom_point(aes(y = .pred)) +  -->
-<!--   geom_errorbar(aes(ymin = .pred_lower,  -->
-<!--                     ymax = .pred_upper), -->
-<!--                 width = .2) +  -->
-<!--   labs(y = "CYCLIN B1") -->
-
-<!-- ``` -->
-
-
-
-
-<!-- ## Evaluating model performance  -->
 
 <!-- ## Conclusion -->
