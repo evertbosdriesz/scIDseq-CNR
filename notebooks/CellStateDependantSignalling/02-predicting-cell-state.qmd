@@ -36,11 +36,73 @@ library(ggplot2)
 library(furrr)
 library(future.apply)
 plan(multisession)
+library(patchwork)
 
 source(here("src", "graphics-options.R"))
  
 ## Global options
 options(max.print = "80")
+
+#plotting theme
+AXIS_TITLE = 18
+AXIS_TEXT = 18
+LEGEND_TITLE = 15
+LEGEND_TEXT = 12
+PLOT_TITLE = 18
+PLOT_CAPTION = 18
+theme_beauty <- function(x_axis_label_rotation = 0){ 
+  font <- "Helvetica"   #font family
+  theme_light() %+replace%  #generally light scheme
+    theme(
+      
+      #grid elements
+      panel.grid.major = element_blank(),    #strip major gridlines
+      panel.grid.minor = element_blank(),    #strip minor gridlines
+      #axis.line = element_line(colour = "black", linetype='solid'),
+      axis.ticks = element_line(),
+      panel.border = element_rect(colour = "black", fill=NA, size=1),
+      
+      #since theme_minimal() already strips axis lines, 
+      #we don't need to do that again
+      
+      #text elements
+      plot.title = element_text(             #title
+        family = font,            #set font family
+        size = PLOT_TITLE,                #set font size
+        #face = 'bold',            #bold typeface
+        hjust = 0,                #left align
+        vjust = 2),               #raise slightly
+      
+      plot.subtitle = element_text(          #subtitle
+        family = font,            #font family
+        size = PLOT_CAPTION),               #font size
+      
+      plot.caption = element_text(           #caption
+        family = font,            #font family
+        size = PLOT_CAPTION,                 #font size
+        hjust = 1),               #right align
+      
+      axis.title = element_text(             #axis titles
+        family = font,            #font family
+        size = AXIS_TITLE),               #font size
+      
+      axis.text = element_text(              #axis text
+        family = font,            #axis famuly
+        size = AXIS_TEXT),                #font size
+      
+      #margin dismensions: t,r,b,l
+      axis.text.x = element_text(            #margin for axis text:
+        margin=margin(t=5, b = 10), angle = x_axis_label_rotation),         #t=distance of axis numbering from axis, b=distance of axis label from axis
+      axis.text.y = element_text(            #margin for axis text
+        margin=margin(r=5,l = 10)),         #r=distance of axis numbering from axis, l=distance of axis label from axis
+      
+      #legend
+      legend.text = element_text(colour="#000000", 
+                                 size=LEGEND_TEXT),
+      legend.title=element_text(size=LEGEND_TITLE)
+    )
+}
+
 ```
 
 
@@ -212,18 +274,20 @@ predict_performance_of_outerFold <- function(object, model, data, hyperparams)
 
   return(list("accuracy" = accuracy$.estimate, "ROC_AUC" = roc_auc$.estimate, "ROC_CURVE" = roc_curve, "confusion_matrix" = conf_m))
 }
-predict_performance <- function(data, model, hyperparams)
+predict_performance <- function(data, model, hyperparams, repeats)
 {
   # cross validation scheme
   nested_cellstate_folds <- nested_cv(data, 
-                     outside = vfold_cv(v = 5, repeats = 5, strata = cluster), 
+                     outside = vfold_cv(v = 5, repeats = repeats, strata = cluster), 
                      inside = vfold_cv(v = 5, repeats = 1, strata = cluster)) 
 
   #run final nested cross validation
+  print("START NESTED CROSS VALIDATION")
   tuning_results <- future_apply(nested_cellstate_folds, 1, predict_performance_of_outerFold, model=model, data = data, hyperparams = hyperparams, future.seed=TRUE) 
 }
 
-visualize_performance <- function(results)
+#we have 5 repeats of 5 fold inner and 5 fold outer cross validation
+visualize_performance <- function(results, method, markers)
 {
   accuracy <- list()
   roc_auc <- list()
@@ -234,6 +298,57 @@ visualize_performance <- function(results)
     count <- count + 1
     accuracy <- append(accuracy, i$accuracy)
     roc_auc <- append(roc_auc, i$ROC_AUC)
+    if(is.null(avg_conf_m)){avg_conf_m <- broom::tidy(i$confusion_matrix) %>% select(-value)}
+    else
+    {
+      number <- as.character(count)
+      #prediction is on Y, True on x axis of confusion matrix
+      new_conf_m <- broom::tidy(i$confusion_matrix) %>%
+        mutate("val_{number}" := value) %>%
+        select(-value)
+      avg_conf_m <- merge(avg_conf_m, new_conf_m,by="name")
+    }
+  }
+  #the averaged conf m table has the names in format <cell_prediction_truth>
+  avg_conf_m <- avg_conf_m %>%
+    mutate(sum = rowSums(across(where(is.numeric)), na.rm=TRUE))
+  avg_conf_m[c('Cell', 'X', 'Y')] <- str_split_fixed(avg_conf_m$name, '_', 3)
+  #so finally X is Prediction and Y is Truth
+  avg_conf_m <- avg_conf_m %>%
+    select(c(sum, X, Y))
+  #calcualte percentage of predicted values belonging to Truth
+  avg_conf_m <- avg_conf_m %>%
+    group_by(X) %>%
+    mutate(totalPredictions = sum(sum)) %>%
+    ungroup() %>%
+    mutate(sum = sum/totalPredictions)
+  
+  print(paste0("The average accuracy is ", as.character(mean(unlist(accuracy)))))
+  print(paste0("The average ROC AUC is ", as.character(mean(unlist(roc_auc)))))
+
+  #ggplot(data = avg_conf_m, aes(X, forcats::fct_rev(Y), fill= sum)) + 
+  #  geom_tile() + 
+  #  geom_text(aes(label=sum)) + 
+  #  scale_fill_gradient2(low = "white", mid = "white", high = "blue")
+  
+  
+  ggplot(data = avg_conf_m, aes(X, forcats::fct_rev(Y), size = sum)) + 
+    geom_point(shape = 21, color = "#7f7f7f", fill = "#7f7f7f") + 
+    xlab(paste0("Predicted cluster identity (", method, ")")) + 
+    ylab("Actual cluster identity") +
+    ggtitle(paste0(markers, " markers")) +
+    scale_size_continuous(range = c(-1, 14)) +  # Adjust size range for circles, increase the minimum size to 3
+    theme_beauty() +
+    theme(panel.grid = element_blank(), legend.position = "none")
+}
+
+get_max_value <- function(results)
+{
+  avg_conf_m <- NULL
+  count <- 0
+  for(i in results)
+  {
+    count <- count + 1
     if(is.null(avg_conf_m)){avg_conf_m <- broom::tidy(i$confusion_matrix) %>% select(-value)}
     else
     {
@@ -249,13 +364,7 @@ visualize_performance <- function(results)
   avg_conf_m[c('Cell', 'X', 'Y')] <- str_split_fixed(avg_conf_m$name, '_', 3)
   avg_conf_m <- avg_conf_m %>%
     select(c(sum, X, Y))
-  
-  print(paste0("The average accuracy is ", as.character(mean(unlist(accuracy)))))
-  print(paste0("The average ROC AUC is ", as.character(mean(unlist(roc_auc)))))
-
-  ggplot(data = avg_conf_m, aes(X, forcats::fct_rev(Y), fill= sum)) + 
-    geom_tile() + geom_text(aes(label=sum)) + 
-      scale_fill_gradient2(low = "white", mid = "white", high = "blue")
+  return(max(avg_conf_m$sum))
 }
 
 ```
@@ -288,19 +397,23 @@ For predicting the cell state from signaling markers we achieve an accuracy of 5
 hyperparams <- expand.grid(min_n = c(2, 5,10), mtry = c(2, 5,10), trees = c(500, 1000, 2000))
 
 #data_cell <- dat_cellstate %>% select(-c("sample_id", "treatment"))
-#estimates_cellstate_rf <- predict_performance(data_cell, rf_mod_grid_search, hyperparams)
+#estimates_cellstate_rf <- predict_performance(data_cell, rf_mod_grid_search, hyperparams, repeats = 5)
 #save(estimates_cellstate_rf, file = here("data", "cellstate-prediction", "Results_CellState_RF.RData"))
 estimates_cellstate_rf <- get(load(here("data", "cellstate-prediction", "Results_CellState_RF.RData")))
 
 #data_sig <- dat_sigstate %>% select(-c("sample_id", "treatment"))
-#estimates_sigstate_rf <- predict_performance(data_sig, rf_mod_grid_search, hyperparams)
+#estimates_sigstate_rf <- predict_performance(data_sig, rf_mod_grid_search, hyperparams, repeats = 5)
 #save(estimates_sigstate_rf, file = here("data", "cellstate-prediction", "Results_SigState_RF.RData"))
 estimates_sigstate_rf <- get(load(here("data", "cellstate-prediction", "Results_SigState_RF.RData")))
 
-# Visualizations of results
-visualize_performance(estimates_cellstate_rf)
+# Visualizations of results: calculate a max value of both frames, so that the neighboring plots are scaled similarly
+cell <- visualize_performance(estimates_cellstate_rf, "Random Forest", "Cell-state")
+sig <- visualize_performance(estimates_sigstate_rf, "Random Forest", "Signaling-state")
 
-visualize_performance(estimates_sigstate_rf)
+#the plot reports the percentage of predictions belonging to specific group
+combined_plots <- cell + sig + plot_layout(ncol = 2, axes = 'collect')
+combined_plots
+ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/RF.pdf", combined_plots, width = 10, height = 5, units = "in")
 
 ```
 
@@ -335,18 +448,180 @@ mlr_mod <-
 #MLR
 hyperparams <- 50
 #data_sig <- dat_sigstate %>% select(-c("sample_id", "treatment"))
-#estimates_sigstate_mlr <- predict_performance(data_sig, mlr_mod, hyperparams)
+#estimates_sigstate_mlr <- predict_performance(data_sig, mlr_mod, hyperparams, repeats = 5)
 #save(estimates_sigstate_mlr, file = here("data", "cellstate-prediction", "Results_SigState_MLR.RData"))
+
+#data_cell <- dat_cellstate %>% select(-c("sample_id", "treatment"))
+#estimates_cellstate_mlr <- predict_performance(data_cell, mlr_mod, hyperparams, repeats = 5)
+#save(estimates_cellstate_mlr, file = here("data", "cellstate-prediction", "Results_CellState_MLR.RData"))
+
+#VISUALIZE RESULTS
+estimates_cellstate_mlr <- get(load(here("data", "cellstate-prediction", "Results_CellState_MLR.RData")))
 estimates_sigstate_mlr <- get(load(here("data", "cellstate-prediction", "Results_SigState_MLR.RData")))
 
-visualize_performance(estimates_sigstate_mlr)
+cell <- visualize_performance(estimates_cellstate_mlr, "Multinomial Logistic Regression", "Cell-state")
+sig <- visualize_performance(estimates_sigstate_mlr, "Multinomial Logistic Regression", "Signaling-state")
+
+#the plot reports the percentage of predictions belonging to specific group
+combined_plots <- cell + sig + plot_layout(ncol = 2, axes = 'collect')
+combined_plots
+ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/MLR.pdf", combined_plots, width = 10, height = 5, units = "in")
 
 ```
 
-### GCNN
+### SVM
+
+We performed the same procedure as for the MLR.
+```{r SVM-models, echo=FALSE}
+svm_mod <- 
+  svm_rbf(cost = tune(), rbf_sigma = tune()) |> 
+  set_engine("kernlab") |>
+  set_mode("classification")
+
+```
+
+```{r SVM-predictions}
+
+#SVM
+hyperparams <- 50
+#data_sig <- dat_sigstate %>% select(-c("sample_id", "treatment"))
+#estimates_sigstate_svm <- predict_performance(data_sig, svm_mod, hyperparams, repeats = 5)
+#save(estimates_sigstate_svm, file = here("data", "cellstate-prediction", "Results_SigState_SVM.RData"))
+
+#data_cell <- dat_cellstate %>% select(-c("sample_id", "treatment"))
+#estimates_cellstate_svm <- predict_performance(data_cell, svm_mod, hyperparams, repeats = 5)
+#save(estimates_cellstate_svm, file = here("data", "cellstate-prediction", "Results_CellState_SVM.RData"))
+
+#VISUALIZE RESULTS
+estimates_cellstate_svm <- get(load(here("data", "cellstate-prediction", "Results_CellState_SVM.RData")))
+estimates_sigstate_svm <- get(load(here("data", "cellstate-prediction", "Results_SigState_SVM.RData")))
+
+cell <- visualize_performance(estimates_cellstate_svm, "Support Vector Machine", "Cell-state")
+sig <- visualize_performance(estimates_sigstate_svm, "Support Vector Machine", "Signaling-state")
+
+#the plot reports the percentage of predictions belonging to specific group
+combined_plots <- cell + sig + plot_layout(ncol = 2, axes = 'collect')
+combined_plots
+ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/SVM.pdf", combined_plots, width = 10, height = 5, units = "in")
 
 
+```
+
+```{r Barplots_Correctly_predicted}
+
+#read in all data
+#MLR
+estimates_cellstate_mlr <- get(load(here("data", "cellstate-prediction", "Results_CellState_MLR.RData")))
+estimates_sigstate_mlr <- get(load(here("data", "cellstate-prediction", "Results_SigState_MLR.RData")))
+#RF
+estimates_cellstate_rf <- get(load(here("data", "cellstate-prediction", "Results_CellState_RF.RData")))
+estimates_sigstate_rf <- get(load(here("data", "cellstate-prediction", "Results_SigState_RF.RData")))
+#SVM
+estimates_cellstate_svm <- get(load(here("data", "cellstate-prediction", "Results_CellState_SVM.RData")))
+estimates_sigstate_svm <- get(load(here("data", "cellstate-prediction", "Results_SigState_SVM.RData")))
 
 
+#get percent correctly predicted for all classifiers
+# result dataframe: col method col cell state signalling col percentage
+get_prediction_rate <- function(data)
+{
+
+  values_list <- list()
+  for(i in data)
+  {
+    totalCounts <- sum(i$confusion_matrix$table)
+    truePrecitionCount <- sum(diag(i$confusion_matrix$table))
+    percentage <- truePrecitionCount/totalCounts
+    values_list <- append(values_list, percentage)
+  }
+  mean_value <- mean(unlist(values_list))
+  std_dev <- sd(unlist(values_list))
+
+  return(list(mean_value,std_dev))
+}
+
+#assuming we have 106 draws from the matrix
+make_random <- function(cell_num)
+{
+  values_list <- list()
+  #assuming 5 times 5 repeated 5-times cross val = 25 times
+  for (r in 1:25) 
+  {
+    # Fill the matrix with 106 random values
+    matrix_data <- matrix(0, nrow = 9, ncol = 9)
+    for (i in 1:cell_num) 
+    {
+      row_index <- sample(1:9, 1)
+      col_index <- sample(1:9, 1)
+      # Increment the count for the selected cell
+      matrix_data[row_index, col_index] <- matrix_data[row_index, col_index] + 1
+    }
+     
+    totalCounts <- sum(matrix_data)
+    assertthat::assert_that(totalCounts == cell_num)
+    truePrecitionCount <- sum(diag(matrix_data))
+    percentage <- truePrecitionCount/totalCounts
+    values_list <- append(values_list, percentage)
+  }
+  
+  mean_value <- mean(unlist(values_list))
+  std_dev <- sd(unlist(values_list))
+
+  return(list(mean_value,std_dev))
+}
+
+result <- tibble(
+  name = character(),
+  mean = numeric(),
+  std = numeric(),
+  method = character(),
+  state = character(),
+)
+
+val <- get_prediction_rate(estimates_cellstate_mlr)
+result <- add_row(result, name = "MLR \nCell-state", mean = val[[1]], std = val[[2]], method = "MLR", state = "Cell-state")
+val <- get_prediction_rate(estimates_sigstate_mlr)
+result <- add_row(result, name = "MLR \nSignaling", mean = val[[1]], std = val[[2]], method = "MLR", state = "Signaling")
+
+val <- get_prediction_rate(estimates_cellstate_rf)
+result <- add_row(result, name = "RF \nCell-state", mean = val[[1]], std = val[[2]], method = "RF", state = "Cell-state")
+val <- get_prediction_rate(estimates_sigstate_rf)
+result <- add_row(result, name = "RF \nSignaling", mean = val[[1]], std = val[[2]], method = "RF", state = "Signaling")
+
+val <- get_prediction_rate(estimates_cellstate_svm)
+result <- add_row(result, name = "SVM \nCell-state", mean = val[[1]], std = val[[2]], method = "SVM", state = "Cell-state")
+val <- get_prediction_rate(estimates_sigstate_svm)
+result <- add_row(result, name = "SVM \nSignaling", mean = val[[1]], std = val[[2]], method = "SVM", state = "Signaling")
+
+#cell state has 111, sig 112 cells
+val <- make_random(111)
+result <- add_row(result, name = "Random \nCell-state", mean = val[[1]], std = val[[2]], method = "Random", state = "Cell-state")
+val <- make_random(112)
+result <- add_row(result, name = "Random \nSignaling", mean = val[[1]], std = val[[2]], method = "Random", state = "Signaling")
+
+#Plot result
+
+result$mean <- result$mean * 100
+result$std <- result$std * 100
+result$group <- rep(1:(nrow(result) / 2), each = 2)
+result$method <- factor(result$method, levels = c("MLR", "RF", "SVM", "Random"))
+
+dodge <- position_dodge(width = 0.9)
+plot <- ggplot(result, aes(x = method, y = mean, fill = factor(state))) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.9), width = 0.8) +
+  geom_errorbar(aes(ymin = mean - std, ymax = mean + std),  position = dodge, width = 0.1, color = "black") +
+  theme_beauty(x_axis_label_rotation = 45) +
+  labs(x = "", y = "% correctly predicted", title = "Overall prediction accuracy") +
+  ylim(0, 100) +
+  scale_fill_manual(values = c("#7f7f7f", "#7f7f7f")) +
+  theme(axis.ticks.x = element_blank(), legend.position = "none")  # Remove x-axis ticks
+
+  
+plot
+
+ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/BarplotPredictionAccuracy.pdf", plot, width = 5, height = 5, units = "in")
+
+
+```
 
 <!-- ## Conclusion -->
