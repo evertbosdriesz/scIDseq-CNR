@@ -161,3 +161,10 @@ scIDseq-CNR.Rproj
 scID-seq identifies cell state specific drug responses.gdoc
 results/sample-permutation/
 results/bootstraps/
+codes_internship_Niels_Kramer_s4449339/.RData
+codes_internship_Niels_Kramer_s4449339/R/01_data_in_use/.RData
+codes_internship_Niels_Kramer_s4449339/~$nual for the codes.docx
+results/Supporting Tables/Table S-cnr-sampleperm-pvals.tsv
+results/Supporting Tables/TableS1_tx-cell-state-interactions.xlsx
+results/Supporting Tables/TableS_cnr-sampleperm-pvals.tsv
+src/combine-supplementary-tables.R
