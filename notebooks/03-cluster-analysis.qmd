@@ -30,7 +30,7 @@ Note that this does not the p-values for significance of the interaction term (w
 
 ```{r knitr_init, echo=FALSE, cache=FALSE, message=FALSE}
 library(knitr)
-library(rmdformats)
+# library(rmdformats)
 library(tidyverse)
 library(tidymodels)
 library(here)
@@ -87,9 +87,35 @@ plot_ab <- function(ab) {
 plot_ab("MAPK_APK2_P") + 
   theme(legend.position = "none") +
   presentation_theme +
-  labs(title = "MK2") 
+  labs(title = "APK2") 
   
 ```
+
+```{r}
+ggplot(
+    filter(dat, ab_name == "RSK1_P_S380"),
+    aes(y = zscore, fill = treatment)
+  ) +
+    geom_boxplot() +
+    #ggbeeswarm::geom_beeswarm() +
+    #expand_limits(y = 0) +
+    my_theme +
+    scale_fill_manual(values = col_lst) 
+    labs(title = "RSK1_P_S380", x = "Cell state cluster", y = "z-score normalized ab-expression")
+
+
+ggplot(
+    filter(dat, ab_name == "RSK1_P_T359"),
+    aes(y = zscore, fill = treatment)
+  ) +
+    geom_boxplot() +
+    #ggbeeswarm::geom_beeswarm() +
+    #expand_limits(y = 0) +
+    my_theme +
+    scale_fill_manual(values = col_lst) 
+
+```
+
 
 ```{r fig.width=3, fig.height=5, eval=FALSE}
 plot_ab_nocluster <- function(ab) {
@@ -140,8 +166,14 @@ dat %>%
   distinct() %>% 
   ggplot(aes(x = cluster, fill = treatment)) +
   geom_bar() +
-  scale_fill_manual(values = col_lst) +
+  scale_fill_manual(values = col_lst, labels = tx_labs, name = "Treatment") +
+  labs(x = "Cell state cluster", y = "Number of cells") +
+  theme(legend.key.size = unit(0.3, 'cm')) +
   my_theme
+
+ggsave(
+  here("figures/manuscript/Supplemental figures/tx-cellstate-distribution.pdf"),
+  width = 3, height = 2)
 ```
 
 We expect the treatments to be balanced over the clusters, as the duration of the treatment is too short to affect the cell state.
@@ -216,19 +248,30 @@ signif_interactions_anova <-
   mutate(fdr = p.adjust(p.value, method = "BH")) %>% 
   arrange(fdr) %>% 
   filter(fdr < 0.05) 
-  
-select(signif_interactions_anova, ab_name, statistic, p.value, fdr)
 
 write_tsv(signif_interactions_anova, here("results",  "treatment_cellstate_interactions_anova.tsv"))
 ```
 
+In total `r model_anova |> filter(term == "treatment:cluster" & fdr < 0.05) |> nrow()` antibodies have a significant interaction ($p<0.05$) according to a one-way ANOVA analysis
+
+
+```{r write supproting table lm model}
+writexl::write_xlsx(
+      list("coefficients" = model_interaction, "anova" = model_anova),
+      path = here("results/Supporting Tables/TableS1_tx-cell-state-interactions.xlsx"),
+      col_names = TRUE
+)
+```
+
+
 ### Regression with interaction term
 
-To get p-values for each individual interaction term we .
+To get p-values for each individual interaction term, we can simply inspect the coefficients of the interaction term in the linear model.
 
 Note that the final model is mathematically equivalent to the two-way ANOVA in that model predictions/fits are identical.
 Let's consider the significant interactions.
 A table with all significant interactions is written to results/scIDseq/treatment_cellstate_interactions.tsv, and a table with all coefficients of the linear and interaction model to results/scIDseq/model-exp-lm.tsv and results/scIDseq/model-exp-interaction.tsv, respectively.
+
 
 ```{r signif_interactions}
 signif_interactions <-
@@ -244,16 +287,27 @@ signif_interactions <-
 write_tsv(signif_interactions, here("results", "treatment_cellstate_interactions.tsv"))
 ```
 
-```{r}
-filter(signif_interactions, cluster == "5")
-```
-
-There are `r nrow(signif)` significant interactions.
+There are `r nrow(signif)` (or of a possible `r model_interaction %>% filter(term_type == "interaction") |> nrow()`) significant interactions.
 What are the stongest ones?
 
 ```{r}
 head(signif_interactions, n = 10)
 ```
+
+```{r}
+ggplot(signif_interactions, aes(x=cluster, fill=treatment)) +
+  geom_bar() +
+  scale_fill_manual(values = col_lst, labels = tx_labs, name = "Treatment") +
+  labs(x = "Cell state cluster", y = "Number of significant interaction coefficients") +
+  theme(legend.key.size = unit(0.3, 'cm')) +
+  my_theme +
+  theme(legend.position = "bottom")
+
+ggsave(
+  here("figures/manuscript/Supplemental figures/significant-interaction-cellstate-distribution.pdf"),
+  width = 2, height = 2)
+```
+
 
 Cluster 9 seems to show the most.
 Indeed, most are between p70S6K inhibition and cluster 9.
@@ -390,10 +444,10 @@ save_plot_model <- function(ab){
 # purrr::map(ab_list, save_plot_model)
 ```
 
-### Overview of all term
+### Overview of all terms
 
 We'll also create an overview of all interaction terms.
-Signifance is indicated by a black circle around the dot.
+Significance is indicated by a black circle around the dot.
 
 ```{r}
 ordered_ab_lst <- read_csv(
@@ -419,9 +473,42 @@ plt <- model_interaction %>%
     cluster = stringr::str_replace(cluster, "cluster", "")
   )  %>% 
   mutate(
-    ab_name = factor(ab_name, levels = ordered_ab_lst)
+    ab_name = factor(ab_name, levels = ordered_ab_lst),
+    cluster = factor(cluster, levels = c("9", "8", "7", "6", "5", "4", "3", "2"))
     ) %>%
   ggplot(aes(x = ab_name, y = cluster)) +
+  geom_point(aes(size = -log10(p.value), fill = estimate, color = significant), shape = 21) +
+  scale_size(range = c(0,5)) +
+  scale_color_manual(breaks = c(TRUE, FALSE), values = c("black", "white")) +
+  colorspace::scale_fill_continuous_diverging("Blue-Red 2", name = "Effect size") +
+  cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
+  labs(x = "", y = "Cell state") +
+  #scale_x_discrete(position = "top") +
+  guides(color = FALSE) +
+  facet_wrap(~treatment, nrow = 2) +
+  scale_x_discrete(position = "top") 
+plt
+ggsave(here("figures",  "interaction-terms-ref=C1.pdf"), plt, width = 10, height = 4)
+```
+
+
+For the sake of completeness, let's also visualize the cell state and treatment coefficients.
+
+```{r}
+plt <- model_interaction %>% 
+  filter(term_type == "cluster") %>%
+  mutate(significant = p.value < 0.05) %>%
+  #separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>%
+  # mutate(
+  #   treatment = stringr::str_replace(treatment, "treatment", ""),
+  #   cluster = stringr::str_replace(cluster, "cluster", "")
+  # )  %>% 
+  mutate(
+    ab_name = factor(ab_name, levels = ordered_ab_lst),
+    term = stringr::str_replace(term, "cluster", "")
+    ) %>%
+  ggplot(aes(x = ab_name, y = term)) +
   geom_point(aes(size = -log10(p.value), fill = estimate, color = significant), shape = 21) +
   scale_size(range = c(0,5)) +
   scale_color_manual(breaks = c(TRUE, FALSE), values = c("black", "white")) +
@@ -429,11 +516,43 @@ plt <- model_interaction %>%
   cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica") +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(x = "", y = "Cell state") +
-  guides(color = FALSE) +
-  facet_wrap(~treatment, nrow = 2)
+  guides(color = "none") #+
+  #facet_wrap(~treatment, nrow = 2)
+
+ggsave(here("figures",  "cell-state-coefficients-ref=C1.pdf"), plt, width = 10, height = 3)
 plt
-ggsave(here("figures",  "interaction-terms-ref=C1.pdf"), plt, width = 10, height = 4)
 ```
+
+```{r}
+plt <- model_interaction %>% 
+  filter(term_type == "treatment") %>%
+  mutate(significant = p.value < 0.05) %>%
+  #separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>%
+  mutate(
+    term = stringr::str_replace(term, "treatmentip70S6K_EGF", "p70S6Ki"),
+    term = stringr::str_replace(term, "treatmentiRSK_EGF", "p90RSKi"),
+    ab_name = factor(ab_name, levels = ordered_ab_lst)
+    ) %>%
+  mutate(
+    term = stringr::str_replace(term, "treatment", ""),
+    ab_name = factor(ab_name, levels = ordered_ab_lst)
+    ) %>%
+
+  ggplot(aes(x = ab_name, y = term)) +
+  geom_point(aes(size = -log10(p.value), fill = estimate, color = significant), shape = 21) +
+  scale_size(range = c(0,5)) +
+  scale_color_manual(breaks = c(TRUE, FALSE), values = c("black", "white")) +
+  colorspace::scale_fill_continuous_diverging("Blue-Red 2") +
+  cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = "", y = "Treatment") +
+  guides(color = "none") #+
+  #facet_wrap(~treatment, nrow = 2)
+
+ggsave(here("figures",  "treatment-coefficients-ref=C1.pdf"), plt, width = 10, height = 2.5)
+plt
+```
+
 
 ## Using different reference clusters
 
@@ -532,10 +651,86 @@ ggplot(tmp, aes(x = estimate.ref1, y=estimate.ref3)) +
 
 The plot above shows that these are highly correlated.
 
+```{r}
+
+dat_altrefs <- purrr::map(
+  c("1", "2", "3", "4", "5", "6", "7", "8", "9"),
+  \(x) mutate(dat, cluster = forcats::fct_relevel(cluster, x), ref_cluster = x)
+)
+
+fit_lst_altrefs <- purrr::map(
+  dat_altrefs,
+  \(x) purrr::map(ab_name_lst, get_fit, x, formula_interaction)
+)
+
+
+get_model_altref <- function(fit_lst){
+  purrr::map(fit_lst, function(x) broom::tidy(x)) %>%
+  bind_rows(.id = "ab_name") %>%
+  mutate(fdr = p.adjust(p.value, method = "BH")) %>%
+  mutate(term_type = case_when(
+    str_detect(term, ":") ~ "interaction",
+    str_detect(term, "(Intercept)") ~ "intercept",
+    str_detect(term, "treatment") ~ "treatment",
+  TRUE ~ "cluster"
+  ))
+}
+
+model_altref <- 
+  purrr::map(fit_lst_altrefs, get_model_altref) |> 
+  bind_rows(.id="id")
+
+
+model_altref |> 
+  filter(term_type == "interaction" ) |> 
+  select(id, term, ab_name, estimate) |> 
+  pivot_wider(names_from = id, values_from = estimate)
+
+facet_labels_altred <- list(
+  '2' = "Cell state 2",
+  '3' = "Cell state 3",
+  '4' = "Cell state 4",
+  '5' = "Cell state 5",
+  '6' = "Cell state 6",
+  '7' = "Cell state 7",
+  '8' = "Cell state 8",
+  '9' = "Cell state 9"
+)
+
+facet_labeller <- function(variable,value){
+  return(facet_labels_altred[value])
+}
+
+plt <- 
+  inner_join(
+  model_altref |> 
+    filter(term_type == "interaction" & id != "1") |> 
+    select(id, ab_name, term, estimate),
+  model_altref |> 
+    filter(term_type == "interaction" & id == "1") |> 
+    select(term, ab_name, ref_estimate = estimate),
+  by = c("term", "ab_name")
+  ) |> 
+  ggplot(aes(x = ref_estimate, y = estimate)) +
+  geom_abline(color = "gray") +
+  geom_point(size = 0.1) +
+    facet_wrap(~id, labeller = facet_labeller, scales = "free", ncol = 4) +
+  my_theme +
+  labs(
+    x = "Cell state 1 as reference", y = "Alternative cell state as reference",
+    title = "Effect sizes of interaction term"
+    )
+  
+plt
+ggsave(here("figures","manuscript", "Supplemental figures",  "interaction_term_effectsize_altref.pdf"), plt, 
+       width = 210, height = 90, units = "mm")
+```
+
+
 ## Using altenative inputs
 
-We have used the TMM normalized data to perform the interaction term analysis.
-Here we just check that using the TMM-data gives identical p-values for the two-way anova and the regression model.
+Above we have used the z-score and TMM normalized data to perform the interaction term analysis.
+Here we just check that using only TMM normalized data (i.e. without subsequent z-score normatization) gives identical p-values for the two-way anova and the regression model.
 
 ```{r using tmm data}
 formula_tmm <- ab_count_tmm ~ cluster * treatment

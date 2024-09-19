@@ -40,10 +40,10 @@ presentation_theme <- theme(
   strip.background = element_rect(fill = NA)
 )
 
-col_lst <- c('EGF' = 'forestgreen', # "#228B22"
-             'ip70S6K_EGF' = 'lightblue', # HEX code "#ADD8E6"
-             'iRSK_EGF' = 'firebrick') # Hex code"#B22222"
+col_lst <- c('EGF' = 'lightgray', # "#228B22"
+             'ip70S6K_EGF' = '#0496A5', # HEX code "#ADD8E6"
+             'iRSK_EGF' = '#E26D03')
 
 tx_labs <- c('EGF' = 'Control',
-             'ip70S6K_EGF' = 'p70-S6Ki',
-             'iRSK_EGF' = 'RSKi')
+             'ip70S6K_EGF' = 'p70S6Ki',
+             'iRSK_EGF' = 'p90RSKi')
