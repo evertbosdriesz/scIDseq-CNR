@@ -168,3 +168,6 @@ results/Supporting Tables/Table S-cnr-sampleperm-pvals.tsv
 results/Supporting Tables/TableS1_tx-cell-state-interactions.xlsx
 results/Supporting Tables/TableS_cnr-sampleperm-pvals.tsv
 src/combine-supplementary-tables.R
+notebooks/DataProcessing/TreatmentDependantFoldChange/Icon
+notebooks/CellStateDependantTreatmentEffects/clean_data/Icon
+notebooks/CellStateDependantTreatmentEffects/analysis/Icon
