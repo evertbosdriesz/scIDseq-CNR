@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="en" xml:lang="en"><head>
+
+<meta charset="utf-8">
+<meta name="generator" content="quarto-1.5.57">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+
+<meta name="author" content="Evert Bosdriesz">
+<meta name="dcterms.date" content="2024-10-08">
+
+<title>Cell state dependent drug response analysis</title>
+<style>
+code{white-space: pre-wrap;}
+span.smallcaps{font-variant: small-caps;}
+div.columns{display: flex; gap: min(4vw, 1.5em);}
+div.column{flex: auto; overflow-x: auto;}
+div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+ul.task-list{list-style: none;}
+ul.task-list li input[type="checkbox"] {
+  width: 0.8em;
+  margin: 0 0.8em 0.2em -1em; /* quarto-specific, see https://github.com/quarto-dev/quarto-cli/issues/4556 */ 
+  vertical-align: middle;
+}
+/* CSS for syntax highlighting */
+pre > code.sourceCode { white-space: pre; position: relative; }
+pre > code.sourceCode > span { line-height: 1.25; }
+pre > code.sourceCode > span:empty { height: 1.2em; }
+.sourceCode { overflow: visible; }
+code.sourceCode > span { color: inherit; text-decoration: inherit; }
+div.sourceCode { margin: 1em 0; }
+pre.sourceCode { margin: 0; }
+@media screen {
+div.sourceCode { overflow: auto; }
+}
+@media print {
+pre > code.sourceCode { white-space: pre-wrap; }
+pre > code.sourceCode > span { display: inline-block; text-indent: -5em; padding-left: 5em; }
+}
+pre.numberSource code
+  { counter-reset: source-line 0; }
+pre.numberSource code > span
+  { position: relative; left: -4em; counter-increment: source-line; }
+pre.numberSource code > span > a:first-child::before
+  { content: counter(source-line);
+    position: relative; left: -1em; text-align: right; vertical-align: baseline;
+    border: none; display: inline-block;
+    -webkit-touch-callout: none; -webkit-user-select: none;
+    -khtml-user-select: none; -moz-user-select: none;
+    -ms-user-select: none; user-select: none;
+    padding: 0 4px; width: 4em;
+  }
+pre.numberSource { margin-left: 3em;  padding-left: 4px; }
+div.sourceCode
+  {   }
+@media screen {
+pre > code.sourceCode > span > a:first-child::before { text-decoration: underline; }
+}
+</style>
+
+
+<script src="02_cell-state-depenedent-drug-response_files/libs/clipboard/clipboard.min.js"></script>
+<script src="02_cell-state-depenedent-drug-response_files/libs/quarto-html/quarto.js"></script>
+<script src="02_cell-state-depenedent-drug-response_files/libs/quarto-html/popper.min.js"></script>
+<script src="02_cell-state-depenedent-drug-response_files/libs/quarto-html/tippy.umd.min.js"></script>
+<script src="02_cell-state-depenedent-drug-response_files/libs/quarto-html/anchor.min.js"></script>
+<link href="02_cell-state-depenedent-drug-response_files/libs/quarto-html/tippy.css" rel="stylesheet">
+<link href="02_cell-state-depenedent-drug-response_files/libs/quarto-html/quarto-syntax-highlighting.css" rel="stylesheet" id="quarto-text-highlighting-styles">
+<script src="02_cell-state-depenedent-drug-response_files/libs/bootstrap/bootstrap.min.js"></script>
+<link href="02_cell-state-depenedent-drug-response_files/libs/bootstrap/bootstrap-icons.css" rel="stylesheet">
+<link href="02_cell-state-depenedent-drug-response_files/libs/bootstrap/bootstrap.min.css" rel="stylesheet" id="quarto-bootstrap" data-mode="light">
+
+  <script src="https://cdnjs.cloudflare.com/polyfill/v3/polyfill.min.js?features=es6"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml-full.js" type="text/javascript"></script>
+
+<script type="text/javascript">
+const typesetMath = (el) => {
+  if (window.MathJax) {
+    // MathJax Typeset
+    window.MathJax.typeset([el]);
+  } else if (window.katex) {
+    // KaTeX Render
+    var mathElements = el.getElementsByClassName("math");
+    var macros = [];
+    for (var i = 0; i < mathElements.length; i++) {
+      var texText = mathElements[i].firstChild;
+      if (mathElements[i].tagName == "SPAN") {
+        window.katex.render(texText.data, mathElements[i], {
+          displayMode: mathElements[i].classList.contains('display'),
+          throwOnError: false,
+          macros: macros,
+          fleqn: false
+        });
+      }
+    }
+  }
+}
+window.Quarto = {
+  typesetMath
+};
+</script>
+
+</head>
+
+<body class="fullcontent">
+
+<div id="quarto-content" class="page-columns page-rows-contents page-layout-article">
+
+<main class="content" id="quarto-document-content">
+
+<header id="title-block-header" class="quarto-title-block default">
+<div class="quarto-title">
+<h1 class="title">Cell state dependent drug response analysis</h1>
+</div>
+
+
+
+<div class="quarto-title-meta">
+
+    <div>
+    <div class="quarto-title-meta-heading">Author</div>
+    <div class="quarto-title-meta-contents">
+             <p>Evert Bosdriesz </p>
+          </div>
+  </div>
+    
+    <div>
+    <div class="quarto-title-meta-heading">Published</div>
+    <div class="quarto-title-meta-contents">
+      <p class="date">October 8, 2024</p>
+    </div>
+  </div>
+  
+    
+  </div>
+  
+
+
+</header>
+
+
+<section id="background" class="level2">
+<h2 class="anchored" data-anchor-id="background">Background</h2>
+<p>Single cells were clustered into 9 cell state clusters based on the expression of proteins that were not differentially expressed between drug treatments (c.f. cell-state-clustering folder). These clusters appear to have some relation to signaling-state. Here, we investigate if some (phospho-)protein responses are cluster dependent, as this would suggest a cell-state dependent drug response that is potentially relevant to drug resistance. To this end, we regress the expression of each antibody in each cell to the drug-treatment and cell-state cluster, and include an interaction term, i.e.&nbsp;we fit the following model for each antibody.</p>
+<p><span class="math display">\[expression_{i,x} ~ \beta_0 + \beta_{t}*treatment + \beta_{c}*cellstate + \beta_{i}*treatment * cellstate\]</span></p>
+<p>Antibodies for which there are significant interaction term show signs cell-state dependent drug response.</p>
+<p>We will use the z-score normalized data as input because this allows for visualization of all antibodies on the same scale. Note that this does not affect the p-values for significance of the interaction term (which is shown at the end of the notebook).</p>
+<p>Our input data looks as follows:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>dat_tmm <span class="ot">&lt;-</span> <span class="fu">read_tsv</span>(<span class="fu">here</span>(<span class="st">"data"</span>, <span class="st">"processed"</span>, <span class="st">"scIDseq-vanEijl-tmm.tsv"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(sample_id, treatment, ab_name, ab_type, ab_count_tmm) <span class="sc">%&gt;%</span> </span>
+<span id="cb1-3"><a href="#cb1-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(treatment <span class="sc">!=</span> <span class="st">"No_EGF"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb1-4"><a href="#cb1-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">treatment =</span> <span class="fu">factor</span>(treatment, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"EGF"</span>, <span class="st">"ip70S6K_EGF"</span>, <span class="st">"iRSK_EGF"</span>)))</span>
+<span id="cb1-5"><a href="#cb1-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-6"><a href="#cb1-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-7"><a href="#cb1-7" aria-hidden="true" tabindex="-1"></a>dat_zscore <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(</span>
+<span id="cb1-8"><a href="#cb1-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">here</span>(<span class="st">"data"</span>, <span class="st">"processed"</span> ,<span class="st">"TMM_normalised_z_transformed_concencus_clusters.csv"</span>)</span>
+<span id="cb1-9"><a href="#cb1-9" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb1-10"><a href="#cb1-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(<span class="sc">-</span>...<span class="dv">1</span>, <span class="sc">-</span>plate_number, <span class="sc">-</span>treatment) <span class="sc">%&gt;%</span> </span>
+<span id="cb1-11"><a href="#cb1-11" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">cluster =</span> <span class="fu">as_factor</span>(cluster)) <span class="sc">%&gt;%</span> </span>
+<span id="cb1-12"><a href="#cb1-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_longer</span>(<span class="sc">!</span><span class="fu">c</span>(cluster, sample_id), <span class="at">names_to =</span> <span class="st">"ab_name"</span>, <span class="at">values_to =</span> <span class="st">"zscore"</span>)</span>
+<span id="cb1-13"><a href="#cb1-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-14"><a href="#cb1-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-15"><a href="#cb1-15" aria-hidden="true" tabindex="-1"></a>dat <span class="ot">&lt;-</span> <span class="fu">left_join</span>(dat_tmm, dat_zscore)</span>
+<span id="cb1-16"><a href="#cb1-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb1-17"><a href="#cb1-17" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(dat_tmm, dat_zscore)</span>
+<span id="cb1-18"><a href="#cb1-18" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(dat)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 6 × 7
+  sample_id    treatment   ab_name ab_type ab_count_tmm cluster zscore
+  &lt;chr&gt;        &lt;fct&gt;       &lt;chr&gt;   &lt;chr&gt;          &lt;dbl&gt; &lt;fct&gt;    &lt;dbl&gt;
+1 plate_10_171 ip70S6K_EGF ITGB1   total          0.407 1        0.496
+2 plate_2_171  ip70S6K_EGF ITGB1   total          0.342 2       -0.225
+3 plate_3_171  iRSK_EGF    ITGB1   total          0.274 2       -0.974
+4 plate_6_171  EGF         ITGB1   total          0.149 3       -2.35 
+5 plate_8_171  ip70S6K_EGF ITGB1   total          0.536 4        1.91 
+6 plate_10_169 EGF         ITGB1   total          0.331 2       -0.346</code></pre>
+</div>
+</div>
+<p>We can now visualize the expression of an antibody in an cell-state dependent manner:</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb3"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a>plot_ab <span class="ot">&lt;-</span> <span class="cf">function</span>(ab) {</span>
+<span id="cb3-2"><a href="#cb3-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(</span>
+<span id="cb3-3"><a href="#cb3-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(dat, ab_name <span class="sc">==</span> ab),</span>
+<span id="cb3-4"><a href="#cb3-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">aes</span>(<span class="at">x =</span> cluster, <span class="at">y =</span> zscore, <span class="at">fill =</span> treatment)</span>
+<span id="cb3-5"><a href="#cb3-5" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb3-6"><a href="#cb3-6" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_boxplot</span>() <span class="sc">+</span></span>
+<span id="cb3-7"><a href="#cb3-7" aria-hidden="true" tabindex="-1"></a>    <span class="co">#ggbeeswarm::geom_beeswarm() +</span></span>
+<span id="cb3-8"><a href="#cb3-8" aria-hidden="true" tabindex="-1"></a>    <span class="co">#expand_limits(y = 0) +</span></span>
+<span id="cb3-9"><a href="#cb3-9" aria-hidden="true" tabindex="-1"></a>    my_theme <span class="sc">+</span></span>
+<span id="cb3-10"><a href="#cb3-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> col_lst) <span class="sc">+</span></span>
+<span id="cb3-11"><a href="#cb3-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> ab, <span class="at">x =</span> <span class="st">"Cell state cluster"</span>, <span class="at">y =</span> <span class="st">"z-score normalized ab-expression"</span>)</span>
+<span id="cb3-12"><a href="#cb3-12" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb3-13"><a href="#cb3-13" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-14"><a href="#cb3-14" aria-hidden="true" tabindex="-1"></a>plot_ab_nocluster <span class="ot">&lt;-</span> <span class="cf">function</span>(ab) {</span>
+<span id="cb3-15"><a href="#cb3-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(</span>
+<span id="cb3-16"><a href="#cb3-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(dat, ab_name <span class="sc">==</span> ab),</span>
+<span id="cb3-17"><a href="#cb3-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">aes</span>(<span class="at">x =</span> treatment, <span class="at">y =</span> zscore, <span class="at">color =</span> treatment)</span>
+<span id="cb3-18"><a href="#cb3-18" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb3-19"><a href="#cb3-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_boxplot</span>() <span class="sc">+</span></span>
+<span id="cb3-20"><a href="#cb3-20" aria-hidden="true" tabindex="-1"></a>    ggbeeswarm<span class="sc">::</span><span class="fu">geom_beeswarm</span>() <span class="sc">+</span></span>
+<span id="cb3-21"><a href="#cb3-21" aria-hidden="true" tabindex="-1"></a>    <span class="co">#expand_limits(y = 0) +</span></span>
+<span id="cb3-22"><a href="#cb3-22" aria-hidden="true" tabindex="-1"></a>    presentation_theme <span class="sc">+</span></span>
+<span id="cb3-23"><a href="#cb3-23" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_color_manual</span>(<span class="at">values =</span> col_lst) <span class="sc">+</span></span>
+<span id="cb3-24"><a href="#cb3-24" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_x_discrete</span>(<span class="at">labels =</span> tx_labs) <span class="sc">+</span></span>
+<span id="cb3-25"><a href="#cb3-25" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> ab, <span class="at">x =</span> <span class="st">"Treatment"</span>, <span class="at">y =</span> <span class="st">"Z-Score normalized ab-expression"</span>,</span>
+<span id="cb3-26"><a href="#cb3-26" aria-hidden="true" tabindex="-1"></a>         ) <span class="sc">+</span></span>
+<span id="cb3-27"><a href="#cb3-27" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"none"</span>)</span>
+<span id="cb3-28"><a href="#cb3-28" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb3-29"><a href="#cb3-29" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb3-30"><a href="#cb3-30" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_ab_nocluster</span>(<span class="st">"ERK1_2_P"</span>) <span class="sc">+</span> </span>
+<span id="cb3-31"><a href="#cb3-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"ERK1/2-p"</span>) <span class="sc">+</span> </span>
+<span id="cb3-32"><a href="#cb3-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"none"</span>) <span class="sc">+</span></span>
+<span id="cb3-33"><a href="#cb3-33" aria-hidden="true" tabindex="-1"></a>  presentation_theme </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/plotting%20functions-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_ab</span>(<span class="st">"ERK1_2_P"</span>) <span class="sc">+</span> </span>
+<span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"ERK1/2-p"</span>) <span class="sc">+</span> </span>
+<span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"none"</span>) <span class="sc">+</span></span>
+<span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>  presentation_theme </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/plotting%20functions-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="analysis" class="level2">
+<h2 class="anchored" data-anchor-id="analysis">Analysis</h2>
+<section id="data-exploration" class="level3">
+<h3 class="anchored" data-anchor-id="data-exploration">Data exploration</h3>
+<p>Let’s first briefly explore the clusters. How many cells are there in each cluster, and which treatment did they receive?</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb5"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a>dat <span class="sc">%&gt;%</span> </span>
+<span id="cb5-2"><a href="#cb5-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ungroup</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb5-3"><a href="#cb5-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(sample_id, treatment, cluster) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-4"><a href="#cb5-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(treatment, cluster) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-5"><a href="#cb5-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb5-6"><a href="#cb5-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">N =</span> <span class="fu">n</span>()) <span class="sc">%&gt;%</span> </span>
+<span id="cb5-7"><a href="#cb5-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> treatment, <span class="at">values_from =</span> N) <span class="sc">%&gt;%</span></span>
+<span id="cb5-8"><a href="#cb5-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">total =</span> EGF <span class="sc">+</span> ip70S6K_EGF <span class="sc">+</span> iRSK_EGF)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 9 × 5
+  cluster   EGF ip70S6K_EGF iRSK_EGF total
+  &lt;fct&gt;   &lt;int&gt;       &lt;int&gt;    &lt;int&gt; &lt;int&gt;
+1 1          20          22       12    54
+2 2          30          24       36    90
+3 3          26          20       17    63
+4 4          14          18       13    45
+5 5          14          22       26    62
+6 6          34          17        7    58
+7 7          22          45       17    84
+8 8          22          13       22    57
+9 9          14          13        6    33</code></pre>
+</div>
+</div>
+<p>Or visually.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb7"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb7-1"><a href="#cb7-1" aria-hidden="true" tabindex="-1"></a>dat <span class="sc">%&gt;%</span> </span>
+<span id="cb7-2"><a href="#cb7-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(sample_id, treatment, cluster) <span class="sc">%&gt;%</span> </span>
+<span id="cb7-3"><a href="#cb7-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">distinct</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb7-4"><a href="#cb7-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> cluster, <span class="at">fill =</span> treatment)) <span class="sc">+</span></span>
+<span id="cb7-5"><a href="#cb7-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_bar</span>() <span class="sc">+</span></span>
+<span id="cb7-6"><a href="#cb7-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> col_lst, <span class="at">labels =</span> tx_labs, <span class="at">name =</span> <span class="st">"Treatment"</span>) <span class="sc">+</span></span>
+<span id="cb7-7"><a href="#cb7-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Cell state cluster"</span>, <span class="at">y =</span> <span class="st">"Number of cells"</span>) <span class="sc">+</span></span>
+<span id="cb7-8"><a href="#cb7-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.key.size =</span> <span class="fu">unit</span>(<span class="fl">0.3</span>, <span class="st">'cm'</span>)) <span class="sc">+</span></span>
+<span id="cb7-9"><a href="#cb7-9" aria-hidden="true" tabindex="-1"></a>  my_theme</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/plot_clusters-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb8"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb8-1"><a href="#cb8-1" aria-hidden="true" tabindex="-1"></a><span class="co"># ggsave(</span></span>
+<span id="cb8-2"><a href="#cb8-2" aria-hidden="true" tabindex="-1"></a><span class="co">#   here("figures/manuscript/Supplemental figures/tx-cellstate-distribution.pdf"),</span></span>
+<span id="cb8-3"><a href="#cb8-3" aria-hidden="true" tabindex="-1"></a><span class="co">#   width = 3, height = 2)</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>We expect the treatments to be balanced over the clusters, as the duration of the treatment is too short to affect the cell state.</p>
+</section>
+<section id="model-fitting" class="level3">
+<h3 class="anchored" data-anchor-id="model-fitting">Model fitting</h3>
+<section id="two-way-anova" class="level4">
+<h4 class="anchored" data-anchor-id="two-way-anova">Two-way Anova</h4>
+<p>We’ll first perform a two-way ANOVA as this is the simplest to interpret. This will give us significance levels per antibody, but not for individual interactions terms. The following antibodies have a significant interaction term (which means that the zscores can be significantly better described by a model with an interaction term compared to one without.)</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb9"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb9-1"><a href="#cb9-1" aria-hidden="true" tabindex="-1"></a>ab_name_lst <span class="ot">&lt;-</span> <span class="fu">as.list</span>(<span class="fu">unique</span>(dat<span class="sc">$</span>ab_name))</span>
+<span id="cb9-2"><a href="#cb9-2" aria-hidden="true" tabindex="-1"></a><span class="fu">names</span>(ab_name_lst) <span class="ot">&lt;-</span> ab_name_lst</span>
+<span id="cb9-3"><a href="#cb9-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-4"><a href="#cb9-4" aria-hidden="true" tabindex="-1"></a>model_anova <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(</span>
+<span id="cb9-5"><a href="#cb9-5" aria-hidden="true" tabindex="-1"></a>  ab_name_lst,</span>
+<span id="cb9-6"><a href="#cb9-6" aria-hidden="true" tabindex="-1"></a>  <span class="cf">function</span>(x){<span class="fu">tidy</span>(<span class="fu">aov</span>(zscore <span class="sc">~</span> treatment <span class="sc">*</span> cluster, <span class="at">data =</span> <span class="fu">filter</span>(dat, ab_name <span class="sc">==</span> x)))}</span>
+<span id="cb9-7"><a href="#cb9-7" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span> </span>
+<span id="cb9-8"><a href="#cb9-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"ab_name"</span>)  </span>
+<span id="cb9-9"><a href="#cb9-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-10"><a href="#cb9-10" aria-hidden="true" tabindex="-1"></a>signif_interactions_anova <span class="ot">&lt;-</span> </span>
+<span id="cb9-11"><a href="#cb9-11" aria-hidden="true" tabindex="-1"></a>  model_anova <span class="sc">|&gt;</span> </span>
+<span id="cb9-12"><a href="#cb9-12" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(term <span class="sc">==</span> <span class="st">"treatment:cluster"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb9-13"><a href="#cb9-13" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(<span class="at">fdr =</span> <span class="fu">p.adjust</span>(p.value, <span class="at">method =</span> <span class="st">"BH"</span>)) <span class="sc">|&gt;</span> </span>
+<span id="cb9-14"><a href="#cb9-14" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">arrange</span>(fdr) <span class="sc">|&gt;</span> </span>
+<span id="cb9-15"><a href="#cb9-15" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(fdr <span class="sc">&lt;</span> <span class="fl">0.05</span>) </span>
+<span id="cb9-16"><a href="#cb9-16" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb9-17"><a href="#cb9-17" aria-hidden="true" tabindex="-1"></a>signif_interactions_anova <span class="sc">|&gt;</span> </span>
+<span id="cb9-18"><a href="#cb9-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(ab_name, p.value, fdr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 11 × 3
+   ab_name         p.value      fdr
+   &lt;chr&gt;             &lt;dbl&gt;    &lt;dbl&gt;
+ 1 H3_P           1.10e-11 7.56e-10
+ 2 CYCLIN_B1      2.61e- 5 8.99e- 4
+ 3 CYCLIN_E       2.46e- 4 5.65e- 3
+ 4 H2A_P          1.81e- 3 1.56e- 2
+ 5 FAK            1.75e- 3 1.56e- 2
+ 6 GAPDH          1.76e- 3 1.56e- 2
+ 7 RIBOSOMAL_S6_P 1.09e- 3 1.56e- 2
+ 8 SRC_P          1.27e- 3 1.56e- 2
+ 9 ERK1_2         2.17e- 3 1.67e- 2
+10 AKT2           3.39e- 3 2.34e- 2
+11 STAT5_P        4.31e- 3 2.71e- 2</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb11"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" aria-hidden="true" tabindex="-1"></a><span class="co"># write_tsv(signif_interactions_anova, here("results",  "treatment_cellstate_interactions_anova.tsv"))</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>In total 11 antibodies have a significant interaction (corrected p-value &lt;0.05) according to a one-way ANOVA analysis</p>
+<p>Phospho H3 is the most significant.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb12"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb12-1"><a href="#cb12-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_ab</span>(<span class="st">"H3_P"</span>) <span class="sc">+</span> </span>
+<span id="cb12-2"><a href="#cb12-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"H3-p"</span>) <span class="sc">+</span> </span>
+<span id="cb12-3"><a href="#cb12-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"none"</span>) <span class="sc">+</span></span>
+<span id="cb12-4"><a href="#cb12-4" aria-hidden="true" tabindex="-1"></a>  presentation_theme </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/plot%20p-H3-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="regression-with-interaction-term" class="level4">
+<h4 class="anchored" data-anchor-id="regression-with-interaction-term">Regression with interaction term</h4>
+<p>The downside of an ANOVA model, is that it does not indicate for which cell-state-treatment combination the interactions is (but just that a model with an interaction term fits the data significantly better). Therefor, let’s fit a regular linear model with interaction term. In addition, we obtain the “fit” for each treatment-cluster combination and the corresponding the 95% confidence interval. For comparison, we’ll also fit a model without an interaction term.</p>
+<p>As reference levels, we select EGF only treatment and cluster 1. Later we’ll explore the effect of using different clusters as reference.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb13"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" aria-hidden="true" tabindex="-1"></a>get_fit <span class="ot">&lt;-</span> <span class="cf">function</span>(ab, df, formula){</span>
+<span id="cb13-2"><a href="#cb13-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">lm</span>(formula, <span class="fu">filter</span>(df, ab_name <span class="sc">==</span> ab))</span>
+<span id="cb13-3"><a href="#cb13-3" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb13-4"><a href="#cb13-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-5"><a href="#cb13-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-6"><a href="#cb13-6" aria-hidden="true" tabindex="-1"></a>formula_simple <span class="ot">&lt;-</span> zscore <span class="sc">~</span>  <span class="dv">0</span> <span class="sc">+</span> cluster <span class="sc">+</span> treatment</span>
+<span id="cb13-7"><a href="#cb13-7" aria-hidden="true" tabindex="-1"></a>formula_interaction <span class="ot">&lt;-</span> zscore <span class="sc">~</span> <span class="dv">0</span> <span class="sc">+</span> cluster <span class="sc">*</span> treatment</span>
+<span id="cb13-8"><a href="#cb13-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-9"><a href="#cb13-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-10"><a href="#cb13-10" aria-hidden="true" tabindex="-1"></a>fit_lst_simple <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(ab_name_lst, get_fit, dat, formula_simple)</span>
+<span id="cb13-11"><a href="#cb13-11" aria-hidden="true" tabindex="-1"></a>fit_lst_interaction <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(ab_name_lst, get_fit, dat, formula_interaction)</span>
+<span id="cb13-12"><a href="#cb13-12" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-13"><a href="#cb13-13" aria-hidden="true" tabindex="-1"></a>model_simple <span class="ot">&lt;-</span> </span>
+<span id="cb13-14"><a href="#cb13-14" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(fit_lst_simple, tidy) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-15"><a href="#cb13-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"ab_name"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-16"><a href="#cb13-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fdr =</span> <span class="fu">p.adjust</span>(p.value, <span class="at">method =</span> <span class="st">"BH"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-17"><a href="#cb13-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">term_type =</span> <span class="fu">case_when</span>(</span>
+<span id="cb13-18"><a href="#cb13-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">":"</span>) <span class="sc">~</span> <span class="st">"interaction"</span>,</span>
+<span id="cb13-19"><a href="#cb13-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"(Intercept)"</span>) <span class="sc">~</span> <span class="st">"intercept"</span>,</span>
+<span id="cb13-20"><a href="#cb13-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"treatment"</span>) <span class="sc">~</span> <span class="st">"treatment"</span>,</span>
+<span id="cb13-21"><a href="#cb13-21" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">"cluster"</span></span>
+<span id="cb13-22"><a href="#cb13-22" aria-hidden="true" tabindex="-1"></a>  )) </span>
+<span id="cb13-23"><a href="#cb13-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-24"><a href="#cb13-24" aria-hidden="true" tabindex="-1"></a>model_interaction <span class="ot">&lt;-</span> </span>
+<span id="cb13-25"><a href="#cb13-25" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(fit_lst_interaction, tidy) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-26"><a href="#cb13-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"ab_name"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-27"><a href="#cb13-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fdr =</span> <span class="fu">p.adjust</span>(p.value, <span class="at">method =</span> <span class="st">"BH"</span>)) <span class="sc">%&gt;%</span> </span>
+<span id="cb13-28"><a href="#cb13-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">term_type =</span> <span class="fu">case_when</span>(</span>
+<span id="cb13-29"><a href="#cb13-29" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">":"</span>) <span class="sc">~</span> <span class="st">"interaction"</span>,</span>
+<span id="cb13-30"><a href="#cb13-30" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"(Intercept)"</span>) <span class="sc">~</span> <span class="st">"intercept"</span>,</span>
+<span id="cb13-31"><a href="#cb13-31" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"treatment"</span>) <span class="sc">~</span> <span class="st">"treatment"</span>,</span>
+<span id="cb13-32"><a href="#cb13-32" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">"cluster"</span></span>
+<span id="cb13-33"><a href="#cb13-33" aria-hidden="true" tabindex="-1"></a>  )) </span>
+<span id="cb13-34"><a href="#cb13-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb13-35"><a href="#cb13-35" aria-hidden="true" tabindex="-1"></a><span class="fu">write_tsv</span>(model_simple, <span class="fu">here</span>(<span class="st">"results"</span>, <span class="st">"model-exp-lm"</span>))</span>
+<span id="cb13-36"><a href="#cb13-36" aria-hidden="true" tabindex="-1"></a><span class="fu">write_tsv</span>(model_interaction, <span class="fu">here</span>(<span class="st">"results"</span>, <span class="st">"model-exp-interaction.tsv"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>To get p-values for each individual interaction term, we can simply inspect the coefficients of the interaction term in the linear model.</p>
+<p>Note that the final model is mathematically equivalent to the two-way ANOVA in that model predictions/fits are identical. Let’s consider the significant interactions. A table with all significant interactions is written to results/scIDseq/treatment_cellstate_interactions.tsv, and a table with all coefficients of the linear and interaction model to results/scIDseq/model-exp-lm.tsv and results/scIDseq/model-exp-interaction.tsv, respectively.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>signif_interactions <span class="ot">&lt;-</span></span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  model_interaction <span class="sc">%&gt;%</span> </span>
+<span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"interaction"</span> <span class="sc">&amp;</span> p.value <span class="sc">&lt;</span> <span class="fl">0.05</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(fdr) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">separate</span>(term, <span class="at">into =</span> <span class="fu">c</span>(<span class="st">"cluster"</span>, <span class="st">"treatment"</span>), <span class="at">sep =</span> <span class="st">":"</span>, <span class="at">remove =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-6"><a href="#cb14-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb14-7"><a href="#cb14-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">treatment =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(treatment, <span class="st">"treatment"</span>, <span class="st">""</span>),</span>
+<span id="cb14-8"><a href="#cb14-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(cluster, <span class="st">"cluster"</span>, <span class="st">""</span>)</span>
+<span id="cb14-9"><a href="#cb14-9" aria-hidden="true" tabindex="-1"></a>  )  </span>
+<span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb14-11"><a href="#cb14-11" aria-hidden="true" tabindex="-1"></a><span class="fu">write_tsv</span>(signif_interactions, <span class="fu">here</span>(<span class="st">"results"</span>, <span class="st">"treatment_cellstate_interactions.tsv"</span>))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>There are (or of a possible 1104) significant interactions. What are the stongest ones?</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb15"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" aria-hidden="true" tabindex="-1"></a><span class="fu">head</span>(signif_interactions, <span class="at">n =</span> <span class="dv">10</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 10 × 10
+   ab_name term  cluster treatment estimate std.error statistic  p.value     fdr
+   &lt;chr&gt;   &lt;chr&gt; &lt;chr&gt;   &lt;chr&gt;        &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt;
+ 1 H3_P    clus… 5       iRSK_EGF     -2.31     0.366     -6.30 6.43e-10 3.24e-8
+ 2 CYCLIN… clus… 9       ip70S6K_…     2.11     0.391      5.40 9.97e- 8 3.10e-6
+ 3 JAK1_P  clus… 9       ip70S6K_…     1.65     0.386      4.29 2.12e- 5 3.21e-4
+ 4 NFKB_P… clus… 9       ip70S6K_…     1.39     0.355      3.92 1.01e- 4 1.28e-3
+ 5 AKT2    clus… 9       ip70S6K_…     1.49     0.386      3.85 1.33e- 4 1.63e-3
+ 6 STAT5_P clus… 9       ip70S6K_…     1.43     0.375      3.81 1.53e- 4 1.85e-3
+ 7 SRC_P   clus… 9       ip70S6K_…     1.42     0.389      3.64 3.02e- 4 3.37e-3
+ 8 ERK1_2  clus… 8       iRSK_EGF     -1.22     0.340     -3.57 3.83e- 4 4.15e-3
+ 9 SMAD1_… clus… 9       ip70S6K_…     1.22     0.362      3.37 7.94e- 4 7.67e-3
+10 SRC_P   clus… 6       ip70S6K_…     1.13     0.338      3.34 8.90e- 4 8.33e-3
+# ℹ 1 more variable: term_type &lt;chr&gt;</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb17"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(signif_interactions, <span class="fu">aes</span>(<span class="at">x=</span>cluster, <span class="at">fill=</span>treatment)) <span class="sc">+</span></span>
+<span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_bar</span>() <span class="sc">+</span></span>
+<span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_fill_manual</span>(<span class="at">values =</span> col_lst, <span class="at">labels =</span> tx_labs, <span class="at">name =</span> <span class="st">"Treatment"</span>) <span class="sc">+</span></span>
+<span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">"Cell state cluster"</span>, <span class="at">y =</span> <span class="st">"Number of significant interaction coefficients"</span>) <span class="sc">+</span></span>
+<span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.key.size =</span> <span class="fu">unit</span>(<span class="fl">0.3</span>, <span class="st">'cm'</span>)) <span class="sc">+</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>  my_theme <span class="sc">+</span></span>
+<span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">legend.position =</span> <span class="st">"bottom"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/unnamed-chunk-2-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb18"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(</span>
+<span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">here</span>(<span class="st">"figures/manuscript/Supplemental figures/significant-interaction-cellstate-distribution.pdf"</span>),</span>
+<span id="cb18-3"><a href="#cb18-3" aria-hidden="true" tabindex="-1"></a>  <span class="at">width =</span> <span class="dv">2</span>, <span class="at">height =</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Cluster 9 seems to show the most. Indeed, most are between p70S6K inhibition and cluster 9.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a><span class="fu">group_by</span>(signif_interactions, cluster, treatment) <span class="sc">%&gt;%</span> </span>
+<span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(<span class="at">N =</span> <span class="fu">n</span>()) <span class="sc">%&gt;%</span> </span>
+<span id="cb19-3"><a href="#cb19-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(<span class="fu">desc</span>(N))</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 16 × 3
+# Groups:   cluster [8]
+   cluster treatment       N
+   &lt;chr&gt;   &lt;chr&gt;       &lt;int&gt;
+ 1 9       ip70S6K_EGF    25
+ 2 8       iRSK_EGF       16
+ 3 9       iRSK_EGF       14
+ 4 8       ip70S6K_EGF     8
+ 5 6       ip70S6K_EGF     7
+ 6 4       iRSK_EGF        5
+ 7 2       ip70S6K_EGF     4
+ 8 6       iRSK_EGF        4
+ 9 7       iRSK_EGF        4
+10 2       iRSK_EGF        3
+11 4       ip70S6K_EGF     3
+12 5       iRSK_EGF        3
+13 3       iRSK_EGF        1
+14 3       ip70S6K_EGF     1
+15 5       ip70S6K_EGF     1
+16 7       ip70S6K_EGF     1</code></pre>
+</div>
+</div>
+<p>However, it should be noted that this is based on just 13 cells.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>model_interaction <span class="sc">%&gt;%</span> </span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"treatment"</span> <span class="sc">&amp;</span> p.value <span class="sc">&lt;</span> <span class="fl">0.05</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(fdr)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 37 × 8
+   ab_name      term     estimate std.error statistic  p.value     fdr term_type
+   &lt;chr&gt;        &lt;chr&gt;       &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;    &lt;dbl&gt;   &lt;dbl&gt; &lt;chr&gt;    
+ 1 ERK1_2_P     treatme…    1.61      0.242      6.65 7.46e-11 4.80e-9 treatment
+ 2 MAPK_APK2_P  treatme…    1.64      0.279      5.87 7.56e- 9 3.35e-7 treatment
+ 3 CMYC         treatme…   -1.51      0.274     -5.51 5.52e- 8 1.87e-6 treatment
+ 4 KALLIKREIN_6 treatme…    1.59      0.300      5.29 1.83e- 7 5.17e-6 treatment
+ 5 NFKB_P65_P   treatme…   -1.15      0.263     -4.37 1.52e- 5 2.42e-4 treatment
+ 6 CJUN_P       treatme…   -0.992     0.242     -4.11 4.63e- 5 6.54e-4 treatment
+ 7 SRC          treatme…   -1.21      0.302     -3.99 7.54e- 5 9.82e-4 treatment
+ 8 RSK1_P_T359  treatme…   -1.12      0.288     -3.87 1.22e- 4 1.51e-3 treatment
+ 9 H2A_P        treatme…   -1.15      0.299     -3.84 1.40e- 4 1.71e-3 treatment
+10 SMAD1        treatme…   -1.16      0.309     -3.76 1.87e- 4 2.20e-3 treatment
+# ℹ 27 more rows</code></pre>
+</div>
+</div>
+</section>
+<section id="visualizations" class="level4">
+<h4 class="anchored" data-anchor-id="visualizations">Visualizations</h4>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>prediction_input <span class="ot">&lt;-</span> <span class="fu">distinct</span>(<span class="fu">select</span>(dat, treatment, cluster)) <span class="sc">%&gt;%</span> </span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(cluster, treatment)</span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>get_predictions <span class="ot">&lt;-</span> <span class="cf">function</span>(fit){</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_cols</span>(</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>    prediction_input,</span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">as_tibble</span>(<span class="fu">predict</span>(fit, prediction_input, <span class="at">interval =</span> <span class="st">"confidence"</span>)))</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>predictions_interaction <span class="ot">&lt;-</span> </span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>  fit_lst_interaction <span class="sc">%&gt;%</span> </span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(get_predictions) <span class="sc">%&gt;%</span> </span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"ab_name"</span>)</span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>predictions_simple <span class="ot">&lt;-</span> </span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>  fit_lst_simple <span class="sc">%&gt;%</span> </span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(get_predictions) <span class="sc">%&gt;%</span> </span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"ab_name"</span>)</span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>predictions <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(<span class="fu">list</span>(</span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>  <span class="st">"interaction"</span> <span class="ot">=</span> predictions_interaction,</span>
+<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>  <span class="st">"simple"</span> <span class="ot">=</span> predictions_simple),</span>
+<span id="cb23-24"><a href="#cb23-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">.id =</span> <span class="st">"model_type"</span></span>
+<span id="cb23-25"><a href="#cb23-25" aria-hidden="true" tabindex="-1"></a>  ) </span>
+<span id="cb23-26"><a href="#cb23-26" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>(predictions_interaction, predictions_simple, prediction_input)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Let’s visualize the expression patterns of some potentially interesting antibodies. In the plots below the model predictions for each treatment-cluster pair are indicated. For comparison, the dark gray points indicate the estimates using a model without an interaction term.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>plot_prediction <span class="ot">&lt;-</span> <span class="cf">function</span>(ab){</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">filter</span>(predictions, ab_name <span class="sc">==</span> ab <span class="sc">&amp;</span> model_type <span class="sc">==</span> <span class="st">"interaction"</span>), </span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">aes</span>(<span class="at">y =</span> fit, <span class="at">x =</span> cluster, <span class="at">color =</span> treatment, <span class="at">group=</span>treatment)) <span class="sc">+</span></span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>      <span class="at">data =</span> <span class="fu">filter</span>(predictions, ab_name <span class="sc">==</span> ab <span class="sc">&amp;</span> model_type <span class="sc">==</span> <span class="st">"simple"</span>),</span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>      <span class="at">color =</span> <span class="st">"darkgray"</span>, <span class="at">size =</span> <span class="dv">4</span>, <span class="at">position =</span> <span class="fu">position_dodge</span>(<span class="at">width =</span> <span class="fl">0.5</span>)) <span class="sc">+</span></span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_errorbar</span>(</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>      <span class="at">data =</span> <span class="fu">filter</span>(predictions, ab_name <span class="sc">==</span> ab <span class="sc">&amp;</span> model_type <span class="sc">==</span> <span class="st">"simple"</span>),</span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>      <span class="fu">aes</span>(<span class="at">y =</span> fit, <span class="at">ymin =</span> lwr, <span class="at">ymax =</span> upr, <span class="at">group =</span> treatment),</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>      <span class="at">width =</span> .<span class="dv">5</span>, <span class="at">position =</span> <span class="fu">position_dodge</span>(<span class="at">width =</span> <span class="fl">0.5</span>), <span class="at">color =</span> <span class="st">"darkgray"</span></span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">+</span></span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="dv">4</span>, <span class="at">position =</span> <span class="fu">position_dodge</span>(<span class="at">width =</span> <span class="fl">0.5</span>)) <span class="sc">+</span></span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_errorbar</span>(</span>
+<span id="cb24-14"><a href="#cb24-14" aria-hidden="true" tabindex="-1"></a>      <span class="fu">aes</span>(<span class="at">y =</span> fit, <span class="at">ymin =</span> lwr, <span class="at">ymax =</span> upr, <span class="at">color =</span> treatment),</span>
+<span id="cb24-15"><a href="#cb24-15" aria-hidden="true" tabindex="-1"></a>      <span class="at">width =</span> .<span class="dv">5</span>, <span class="at">position =</span> <span class="fu">position_dodge</span>(<span class="at">width =</span> <span class="fl">0.5</span>)</span>
+<span id="cb24-16"><a href="#cb24-16" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">+</span></span>
+<span id="cb24-17"><a href="#cb24-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values =</span> col_lst) <span class="sc">+</span> </span>
+<span id="cb24-18"><a href="#cb24-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> ab, <span class="at">x =</span> <span class="st">"Cell state cluster"</span>, <span class="at">y =</span> <span class="st">"z-score (Model estimate)"</span>) <span class="sc">+</span></span>
+<span id="cb24-19"><a href="#cb24-19" aria-hidden="true" tabindex="-1"></a>  my_theme</span>
+<span id="cb24-20"><a href="#cb24-20" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+</section>
+<section id="rski-treatment-and-cluster-5" class="level3">
+<h3 class="anchored" data-anchor-id="rski-treatment-and-cluster-5">RSKi treatment and Cluster 5</h3>
+<p>Cluster 5 has high expression of both H3_P and CYCLIN_B1 (and to a lesser extend, H2A_P), which is affected by RSKi. For H3_P and H2A_P the upregulation in cluster 5 is repressed, whereas for CYCLIN_B1 it is extra pronounced</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_prediction</span>(<span class="st">"H3_P"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/unnamed-chunk-5-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a><span class="fu">plot_prediction</span>(<span class="st">"CYCLIN_B1"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/unnamed-chunk-5-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<!-- ### p70i treatment and cluster 9 -->
+<!-- A large number of antibodies show a similar trend, where they are upregulated upon p70S6K inhibition in cluster 9. -->
+<!-- These include CYCLIN_E, FAK, SCR_P, JAK1_P, STAT5_P, and phospho-NFkB/p65 all show a SRC_P also shows this trent in cluster 6. -->
+<!-- ```{r} -->
+<!-- plot_prediction("CYCLIN_E") -->
+<!-- plot_prediction("FAK") -->
+<!-- plot_prediction("SRC_P") -->
+<!-- plot_prediction("JAK1_P") -->
+<!-- plot_prediction("STAT5_P") -->
+<!-- plot_prediction("EGFR_P_Y1045") -->
+<!-- ``` -->
+<!-- ### Other interesting antibodies -->
+<!-- Finally, RIBOSOMAL_S6_P also has a significant interaction term, which is not so easy to pin to one cluster. -->
+<!-- In clusters 2, it is unexpectedly unresponsive to p70 inhbition, whereas in cluster 6 it is unresponsive to RSK inhibition. -->
+<!-- ```{r} -->
+<!-- plot_prediction("RIBOSOMAL_S6_P") -->
+<!-- ``` -->
+</section>
+<section id="overview-of-all-terms" class="level3">
+<h3 class="anchored" data-anchor-id="overview-of-all-terms">Overview of all terms</h3>
+<p>We’ll also create an overview of all interaction terms. Significance is indicated by a black circle around the dot.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>ordered_ab_lst <span class="ot">&lt;-</span> <span class="fu">read_csv</span>(</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">here</span>(<span class="st">"data"</span>, <span class="st">"for-visualization"</span>, <span class="st">"ordered_antibody_list.csv"</span>), </span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>   <span class="at">col_names =</span> <span class="cn">FALSE</span>)<span class="sc">$</span>X1</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>hc_treats <span class="ot">&lt;-</span> <span class="fu">filter</span>(model_interaction, term_type <span class="sc">==</span> <span class="st">"interaction"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">separate</span>(term, <span class="at">into =</span> <span class="fu">c</span>(<span class="st">"cluster"</span>, <span class="st">"treatment"</span>), <span class="at">sep =</span> <span class="st">":"</span>, <span class="at">remove =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">log10p =</span> <span class="sc">-</span><span class="fu">log10</span>(p.value)) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(ab_name, term, log10p) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> term, <span class="at">values_from =</span> log10p) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">column_to_rownames</span>(<span class="st">"ab_name"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>  <span class="co">#as.matrix %&gt;% </span></span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">dist</span>() <span class="sc">%&gt;%</span> </span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">hclust</span>()</span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>plt <span class="ot">&lt;-</span> model_interaction <span class="sc">%&gt;%</span> </span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"interaction"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">significant =</span> p.value <span class="sc">&lt;</span> <span class="fl">0.05</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">separate</span>(term, <span class="at">into =</span> <span class="fu">c</span>(<span class="st">"cluster"</span>, <span class="st">"treatment"</span>), <span class="at">sep =</span> <span class="st">":"</span>, <span class="at">remove =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a>    <span class="at">treatment =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(treatment, <span class="st">"treatment"</span>, <span class="st">""</span>),</span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(cluster, <span class="st">"cluster"</span>, <span class="st">""</span>)</span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>  )  <span class="sc">%&gt;%</span> </span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">ab_name =</span> <span class="fu">factor</span>(ab_name, <span class="at">levels =</span> ordered_ab_lst),</span>
+<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> <span class="fu">factor</span>(cluster, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"9"</span>, <span class="st">"8"</span>, <span class="st">"7"</span>, <span class="st">"6"</span>, <span class="st">"5"</span>, <span class="st">"4"</span>, <span class="st">"3"</span>, <span class="st">"2"</span>))</span>
+<span id="cb27-26"><a href="#cb27-26" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span></span>
+<span id="cb27-27"><a href="#cb27-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> ab_name, <span class="at">y =</span> cluster)) <span class="sc">+</span></span>
+<span id="cb27-28"><a href="#cb27-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">size =</span> <span class="sc">-</span><span class="fu">log10</span>(p.value), <span class="at">fill =</span> estimate, <span class="at">color =</span> significant), <span class="at">shape =</span> <span class="dv">21</span>) <span class="sc">+</span></span>
+<span id="cb27-29"><a href="#cb27-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">5</span>)) <span class="sc">+</span></span>
+<span id="cb27-30"><a href="#cb27-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">breaks =</span> <span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>), <span class="at">values =</span> <span class="fu">c</span>(<span class="st">"black"</span>, <span class="st">"white"</span>)) <span class="sc">+</span></span>
+<span id="cb27-31"><a href="#cb27-31" aria-hidden="true" tabindex="-1"></a>  colorspace<span class="sc">::</span><span class="fu">scale_fill_continuous_diverging</span>(<span class="st">"Blue-Red 2"</span>, <span class="at">name =</span> <span class="st">"Effect size"</span>) <span class="sc">+</span></span>
+<span id="cb27-32"><a href="#cb27-32" aria-hidden="true" tabindex="-1"></a>  cowplot<span class="sc">::</span><span class="fu">theme_minimal_grid</span>(<span class="at">font_size =</span> <span class="dv">9</span>, <span class="at">font_family =</span> <span class="st">"Helvetica"</span>) <span class="sc">+</span></span>
+<span id="cb27-33"><a href="#cb27-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">90</span>, <span class="at">hjust =</span> <span class="dv">0</span>)) <span class="sc">+</span></span>
+<span id="cb27-34"><a href="#cb27-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">""</span>, <span class="at">y =</span> <span class="st">"Cell state"</span>) <span class="sc">+</span></span>
+<span id="cb27-35"><a href="#cb27-35" aria-hidden="true" tabindex="-1"></a>  <span class="co">#scale_x_discrete(position = "top") +</span></span>
+<span id="cb27-36"><a href="#cb27-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">guides</span>(<span class="at">color =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb27-37"><a href="#cb27-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>treatment, <span class="at">nrow =</span> <span class="dv">2</span>) <span class="sc">+</span></span>
+<span id="cb27-38"><a href="#cb27-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_x_discrete</span>(<span class="at">position =</span> <span class="st">"top"</span>) </span>
+<span id="cb27-39"><a href="#cb27-39" aria-hidden="true" tabindex="-1"></a>plt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/unnamed-chunk-6-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">here</span>(<span class="st">"figures"</span>,  <span class="st">"interaction-terms-ref=C1.pdf"</span>), plt, <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<!-- For the sake of completeness, let's also visualize the cell state and treatment coefficients. -->
+<!-- ```{r} -->
+<!-- plt <- model_interaction %>%  -->
+<!--   filter(term_type == "cluster") %>% -->
+<!--   mutate(significant = p.value < 0.05) %>% -->
+<!--   #separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>% -->
+<!--   # mutate( -->
+<!--   #   treatment = stringr::str_replace(treatment, "treatment", ""), -->
+<!--   #   cluster = stringr::str_replace(cluster, "cluster", "") -->
+<!--   # )  %>%  -->
+<!--   mutate( -->
+<!--     ab_name = factor(ab_name, levels = ordered_ab_lst), -->
+<!--     term = stringr::str_replace(term, "cluster", "") -->
+<!--     ) %>% -->
+<!--   ggplot(aes(x = ab_name, y = term)) + -->
+<!--   geom_point(aes(size = -log10(p.value), fill = estimate, color = significant), shape = 21) + -->
+<!--   scale_size(range = c(0,5)) + -->
+<!--   scale_color_manual(breaks = c(TRUE, FALSE), values = c("black", "white")) + -->
+<!--   colorspace::scale_fill_continuous_diverging("Blue-Red 2") + -->
+<!--   cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica") + -->
+<!--   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + -->
+<!--   labs(x = "", y = "Cell state") + -->
+<!--   guides(color = "none") #+ -->
+<!--   #facet_wrap(~treatment, nrow = 2) -->
+<!-- ggsave(here("figures",  "cell-state-coefficients-ref=C1.pdf"), plt, width = 10, height = 3) -->
+<!-- plt -->
+<!-- ``` -->
+<!-- ```{r} -->
+<!-- plt <- model_interaction %>%  -->
+<!--   filter(term_type == "treatment") %>% -->
+<!--   mutate(significant = p.value < 0.05) %>% -->
+<!--   #separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>% -->
+<!--   mutate( -->
+<!--     term = stringr::str_replace(term, "treatmentip70S6K_EGF", "p70S6Ki"), -->
+<!--     term = stringr::str_replace(term, "treatmentiRSK_EGF", "p90RSKi"), -->
+<!--     ab_name = factor(ab_name, levels = ordered_ab_lst) -->
+<!--     ) %>% -->
+<!--   mutate( -->
+<!--     term = stringr::str_replace(term, "treatment", ""), -->
+<!--     ab_name = factor(ab_name, levels = ordered_ab_lst) -->
+<!--     ) %>% -->
+<!--   ggplot(aes(x = ab_name, y = term)) + -->
+<!--   geom_point(aes(size = -log10(p.value), fill = estimate, color = significant), shape = 21) + -->
+<!--   scale_size(range = c(0,5)) + -->
+<!--   scale_color_manual(breaks = c(TRUE, FALSE), values = c("black", "white")) + -->
+<!--   colorspace::scale_fill_continuous_diverging("Blue-Red 2") + -->
+<!--   cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica") + -->
+<!--   theme(axis.text.x = element_text(angle = 45, hjust = 1)) + -->
+<!--   labs(x = "", y = "Treatment") + -->
+<!--   guides(color = "none") #+ -->
+<!--   #facet_wrap(~treatment, nrow = 2) -->
+<!-- ggsave(here("figures",  "treatment-coefficients-ref=C1.pdf"), plt, width = 10, height = 2.5) -->
+<!-- plt -->
+<!-- ``` -->
+</section>
+</section>
+<section id="using-different-reference-clusters" class="level2">
+<h2 class="anchored" data-anchor-id="using-different-reference-clusters">Using different reference clusters</h2>
+<p>The plot above does not show any interaction terms for cluster 1 because we used cluster 1 as the reference in the plot above. However, this is a somewhat arbitrary choice. Inspection of some of the individual antibodies showed interesting interactions in Clusters, 2, 5, 6, and 9, so we don’t want to use these as reference.</p>
+<p>One way to select a reference cluster is to use the most “average” one. A rough way to determine this is looking at the mean of the absolute z-scores of all antibodies.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>dat <span class="sc">%&gt;%</span> </span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(cluster) <span class="sc">%&gt;%</span> </span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_zscore_abs =</span> <span class="fu">mean</span>(<span class="fu">abs</span>(zscore)),</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">mean_zscore_sq =</span> <span class="fu">mean</span>(zscore<span class="sc">*</span>zscore)</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(mean_zscore_sq)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 9 × 3
+  cluster mean_zscore_abs mean_zscore_sq
+  &lt;fct&gt;             &lt;dbl&gt;          &lt;dbl&gt;
+1 3                 0.616          0.670
+2 1                 0.676          0.785
+3 5                 0.686          0.793
+4 6                 0.691          0.824
+5 4                 0.704          0.929
+6 2                 0.806          0.962
+7 7                 0.750          1.03 
+8 8                 0.882          1.40 
+9 9                 1.10           2.08 </code></pre>
+</div>
+</div>
+<p>This would suggest using cluster 3 as a reference.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb31"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb31-1"><a href="#cb31-1" aria-hidden="true" tabindex="-1"></a>dat_ref3 <span class="ot">&lt;-</span> <span class="fu">mutate</span>(dat, <span class="at">cluster =</span> forcats<span class="sc">::</span><span class="fu">fct_relevel</span>(cluster, <span class="st">"3"</span>))</span>
+<span id="cb31-2"><a href="#cb31-2" aria-hidden="true" tabindex="-1"></a>fit_lst_zscore_ref3 <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(ab_name_lst, get_fit, dat_ref3, formula_interaction)</span>
+<span id="cb31-3"><a href="#cb31-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-4"><a href="#cb31-4" aria-hidden="true" tabindex="-1"></a>model_ref3 <span class="ot">&lt;-</span></span>
+<span id="cb31-5"><a href="#cb31-5" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(fit_lst_zscore_ref3, <span class="cf">function</span>(x) broom<span class="sc">::</span><span class="fu">tidy</span>(x)) <span class="sc">%&gt;%</span></span>
+<span id="cb31-6"><a href="#cb31-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"ab_name"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb31-7"><a href="#cb31-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fdr =</span> <span class="fu">p.adjust</span>(p.value, <span class="at">method =</span> <span class="st">"BH"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb31-8"><a href="#cb31-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">term_type =</span> <span class="fu">case_when</span>(</span>
+<span id="cb31-9"><a href="#cb31-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">":"</span>) <span class="sc">~</span> <span class="st">"interaction"</span>,</span>
+<span id="cb31-10"><a href="#cb31-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"(Intercept)"</span>) <span class="sc">~</span> <span class="st">"intercept"</span>,</span>
+<span id="cb31-11"><a href="#cb31-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"treatment"</span>) <span class="sc">~</span> <span class="st">"treatment"</span>,</span>
+<span id="cb31-12"><a href="#cb31-12" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">"cluster"</span></span>
+<span id="cb31-13"><a href="#cb31-13" aria-hidden="true" tabindex="-1"></a>  ))</span>
+<span id="cb31-14"><a href="#cb31-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-15"><a href="#cb31-15" aria-hidden="true" tabindex="-1"></a>signif_interactions_ref3 <span class="ot">&lt;-</span></span>
+<span id="cb31-16"><a href="#cb31-16" aria-hidden="true" tabindex="-1"></a>  model_ref3 <span class="sc">%&gt;%</span></span>
+<span id="cb31-17"><a href="#cb31-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"interaction"</span> <span class="sc">&amp;</span> p.value <span class="sc">&lt;</span> <span class="fl">0.05</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb31-18"><a href="#cb31-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(fdr) <span class="sc">%&gt;%</span></span>
+<span id="cb31-19"><a href="#cb31-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">separate</span>(term, <span class="at">into =</span> <span class="fu">c</span>(<span class="st">"cluster"</span>, <span class="st">"treatment"</span>), <span class="at">sep =</span> <span class="st">":"</span>, <span class="at">remove =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb31-20"><a href="#cb31-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb31-21"><a href="#cb31-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">treatment =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(treatment, <span class="st">"treatment"</span>, <span class="st">""</span>),</span>
+<span id="cb31-22"><a href="#cb31-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(cluster, <span class="st">"cluster"</span>, <span class="st">""</span>)</span>
+<span id="cb31-23"><a href="#cb31-23" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb31-24"><a href="#cb31-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb31-25"><a href="#cb31-25" aria-hidden="true" tabindex="-1"></a>plt <span class="ot">&lt;-</span> </span>
+<span id="cb31-26"><a href="#cb31-26" aria-hidden="true" tabindex="-1"></a>  model_ref3 <span class="sc">%&gt;%</span></span>
+<span id="cb31-27"><a href="#cb31-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"interaction"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb31-28"><a href="#cb31-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">significant =</span> p.value <span class="sc">&lt;</span> <span class="fl">0.05</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb31-29"><a href="#cb31-29" aria-hidden="true" tabindex="-1"></a>  <span class="fu">separate</span>(term, <span class="at">into =</span> <span class="fu">c</span>(<span class="st">"cluster"</span>, <span class="st">"treatment"</span>), <span class="at">sep =</span> <span class="st">":"</span>, <span class="at">remove =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb31-30"><a href="#cb31-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb31-31"><a href="#cb31-31" aria-hidden="true" tabindex="-1"></a>    <span class="at">treatment =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(treatment, <span class="st">"treatment"</span>, <span class="st">""</span>),</span>
+<span id="cb31-32"><a href="#cb31-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(cluster, <span class="st">"cluster"</span>, <span class="st">""</span>)</span>
+<span id="cb31-33"><a href="#cb31-33" aria-hidden="true" tabindex="-1"></a>  )  <span class="sc">%&gt;%</span></span>
+<span id="cb31-34"><a href="#cb31-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">ab_name =</span> <span class="fu">factor</span>(ab_name, <span class="at">levels =</span> ordered_ab_lst)) <span class="sc">%&gt;%</span> </span>
+<span id="cb31-35"><a href="#cb31-35" aria-hidden="true" tabindex="-1"></a>  <span class="co"># mutate(cluster = factor(cluster, levels = hc_clust$labels[hc_clust$order])) %&gt;% </span></span>
+<span id="cb31-36"><a href="#cb31-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> ab_name, <span class="at">y =</span> cluster)) <span class="sc">+</span>  </span>
+<span id="cb31-37"><a href="#cb31-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="fu">aes</span>(<span class="at">size =</span> <span class="sc">-</span><span class="fu">log10</span>(p.value), <span class="at">fill =</span> estimate, <span class="at">color =</span> significant), <span class="at">shape =</span> <span class="dv">21</span>) <span class="sc">+</span></span>
+<span id="cb31-38"><a href="#cb31-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_size</span>(<span class="at">range =</span> <span class="fu">c</span>(<span class="dv">0</span>,<span class="dv">5</span>)) <span class="sc">+</span></span>
+<span id="cb31-39"><a href="#cb31-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">breaks =</span> <span class="fu">c</span>(<span class="cn">TRUE</span>, <span class="cn">FALSE</span>), <span class="at">values =</span> <span class="fu">c</span>(<span class="st">"black"</span>, <span class="st">"white"</span>)) <span class="sc">+</span></span>
+<span id="cb31-40"><a href="#cb31-40" aria-hidden="true" tabindex="-1"></a>  colorspace<span class="sc">::</span><span class="fu">scale_fill_continuous_diverging</span>(<span class="st">"Blue-Red 2"</span>) <span class="sc">+</span></span>
+<span id="cb31-41"><a href="#cb31-41" aria-hidden="true" tabindex="-1"></a>  cowplot<span class="sc">::</span><span class="fu">theme_minimal_grid</span>(<span class="at">font_size =</span> <span class="dv">9</span>, <span class="at">font_family =</span> <span class="st">"Helvetica"</span>) <span class="sc">+</span></span>
+<span id="cb31-42"><a href="#cb31-42" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme</span>(<span class="at">axis.text.x =</span> <span class="fu">element_text</span>(<span class="at">angle =</span> <span class="dv">45</span>, <span class="at">hjust =</span> <span class="dv">1</span>)) <span class="sc">+</span></span>
+<span id="cb31-43"><a href="#cb31-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">x =</span> <span class="st">""</span>, <span class="at">y =</span> <span class="st">"Cell state"</span>) <span class="sc">+</span></span>
+<span id="cb31-44"><a href="#cb31-44" aria-hidden="true" tabindex="-1"></a>  <span class="fu">guides</span>(<span class="at">color =</span> <span class="cn">FALSE</span>) <span class="sc">+</span></span>
+<span id="cb31-45"><a href="#cb31-45" aria-hidden="true" tabindex="-1"></a>  <span class="fu">facet_wrap</span>(<span class="sc">~</span>treatment, <span class="at">nrow =</span> <span class="dv">2</span>)</span>
+<span id="cb31-46"><a href="#cb31-46" aria-hidden="true" tabindex="-1"></a>plt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/ref3-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb32"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb32-1"><a href="#cb32-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">here</span>(<span class="st">"figures"</span>,  <span class="st">"interaction-terms-ref=C3.pdf"</span>), plt, <span class="at">width =</span> <span class="dv">10</span>, <span class="at">height =</span> <span class="dv">4</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>How much difference does the reference cluster make? Let’s look at the correlation between estimate effect sizes for the interaction term using Cluster 1 and cluster 3 as reference.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb33"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" aria-hidden="true" tabindex="-1"></a>tmp <span class="ot">&lt;-</span> <span class="fu">filter</span>(model_interaction, term_type <span class="sc">==</span> <span class="st">"interaction"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb33-2"><a href="#cb33-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">full_join</span>(</span>
+<span id="cb33-3"><a href="#cb33-3" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(model_ref3, term_type <span class="sc">==</span> <span class="st">"interaction"</span>), </span>
+<span id="cb33-4"><a href="#cb33-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"ab_name"</span>, <span class="st">"term"</span>), <span class="at">suffix =</span> <span class="fu">c</span>(<span class="st">".ref1"</span>, <span class="st">".ref3"</span>)</span>
+<span id="cb33-5"><a href="#cb33-5" aria-hidden="true" tabindex="-1"></a>    ) <span class="sc">%&gt;%</span> </span>
+<span id="cb33-6"><a href="#cb33-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">separate</span>(term, <span class="at">into =</span> <span class="fu">c</span>(<span class="st">"cluster"</span>, <span class="st">"treatement"</span>), <span class="at">sep =</span> <span class="st">":"</span>)</span>
+<span id="cb33-7"><a href="#cb33-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-8"><a href="#cb33-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb33-9"><a href="#cb33-9" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(tmp, <span class="fu">aes</span>(<span class="at">x =</span> estimate.ref1, <span class="at">y=</span>estimate.ref3)) <span class="sc">+</span></span>
+<span id="cb33-10"><a href="#cb33-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>() <span class="sc">+</span></span>
+<span id="cb33-11"><a href="#cb33-11" aria-hidden="true" tabindex="-1"></a>  my_theme <span class="sc">+</span></span>
+<span id="cb33-12"><a href="#cb33-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb33-13"><a href="#cb33-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Cluster 1 as reference"</span>, <span class="at">y =</span> <span class="st">"Cluster 3 as reference"</span>,</span>
+<span id="cb33-14"><a href="#cb33-14" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Effect sizes of interaction term"</span></span>
+<span id="cb33-15"><a href="#cb33-15" aria-hidden="true" tabindex="-1"></a>    )</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/unnamed-chunk-7-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The plot above shows that these are highly correlated.</p>
+<p>We can repeat this for all possible reference clusters. The plot below shows that the interaction term coefficients are highly correlated in all cases.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb34"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb34-1"><a href="#cb34-1" aria-hidden="true" tabindex="-1"></a>dat_altrefs <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(</span>
+<span id="cb34-2"><a href="#cb34-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">c</span>(<span class="st">"1"</span>, <span class="st">"2"</span>, <span class="st">"3"</span>, <span class="st">"4"</span>, <span class="st">"5"</span>, <span class="st">"6"</span>, <span class="st">"7"</span>, <span class="st">"8"</span>, <span class="st">"9"</span>),</span>
+<span id="cb34-3"><a href="#cb34-3" aria-hidden="true" tabindex="-1"></a>  \(x) <span class="fu">mutate</span>(dat, <span class="at">cluster =</span> forcats<span class="sc">::</span><span class="fu">fct_relevel</span>(cluster, x), <span class="at">ref_cluster =</span> x)</span>
+<span id="cb34-4"><a href="#cb34-4" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb34-5"><a href="#cb34-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-6"><a href="#cb34-6" aria-hidden="true" tabindex="-1"></a>fit_lst_altrefs <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(</span>
+<span id="cb34-7"><a href="#cb34-7" aria-hidden="true" tabindex="-1"></a>  dat_altrefs,</span>
+<span id="cb34-8"><a href="#cb34-8" aria-hidden="true" tabindex="-1"></a>  \(x) purrr<span class="sc">::</span><span class="fu">map</span>(ab_name_lst, get_fit, x, formula_interaction)</span>
+<span id="cb34-9"><a href="#cb34-9" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb34-10"><a href="#cb34-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-11"><a href="#cb34-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-12"><a href="#cb34-12" aria-hidden="true" tabindex="-1"></a>get_model_altref <span class="ot">&lt;-</span> <span class="cf">function</span>(fit_lst){</span>
+<span id="cb34-13"><a href="#cb34-13" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(fit_lst, <span class="cf">function</span>(x) broom<span class="sc">::</span><span class="fu">tidy</span>(x)) <span class="sc">%&gt;%</span></span>
+<span id="cb34-14"><a href="#cb34-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"ab_name"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb34-15"><a href="#cb34-15" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fdr =</span> <span class="fu">p.adjust</span>(p.value, <span class="at">method =</span> <span class="st">"BH"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb34-16"><a href="#cb34-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">term_type =</span> <span class="fu">case_when</span>(</span>
+<span id="cb34-17"><a href="#cb34-17" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">":"</span>) <span class="sc">~</span> <span class="st">"interaction"</span>,</span>
+<span id="cb34-18"><a href="#cb34-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"(Intercept)"</span>) <span class="sc">~</span> <span class="st">"intercept"</span>,</span>
+<span id="cb34-19"><a href="#cb34-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"treatment"</span>) <span class="sc">~</span> <span class="st">"treatment"</span>,</span>
+<span id="cb34-20"><a href="#cb34-20" aria-hidden="true" tabindex="-1"></a>  <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">"cluster"</span></span>
+<span id="cb34-21"><a href="#cb34-21" aria-hidden="true" tabindex="-1"></a>  ))</span>
+<span id="cb34-22"><a href="#cb34-22" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb34-23"><a href="#cb34-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-24"><a href="#cb34-24" aria-hidden="true" tabindex="-1"></a>model_altref <span class="ot">&lt;-</span> </span>
+<span id="cb34-25"><a href="#cb34-25" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(fit_lst_altrefs, get_model_altref) <span class="sc">|&gt;</span> </span>
+<span id="cb34-26"><a href="#cb34-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id=</span><span class="st">"id"</span>)</span>
+<span id="cb34-27"><a href="#cb34-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-28"><a href="#cb34-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb34-29"><a href="#cb34-29" aria-hidden="true" tabindex="-1"></a>model_altref <span class="sc">|&gt;</span> </span>
+<span id="cb34-30"><a href="#cb34-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"interaction"</span> ) <span class="sc">|&gt;</span> </span>
+<span id="cb34-31"><a href="#cb34-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">select</span>(id, term, ab_name, estimate) <span class="sc">|&gt;</span> </span>
+<span id="cb34-32"><a href="#cb34-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">pivot_wider</span>(<span class="at">names_from =</span> id, <span class="at">values_from =</span> estimate)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code># A tibble: 1,242 × 11
+   term   ab_name     `1`     `2`     `3`     `4`     `5`     `6`     `7`    `8`
+   &lt;chr&gt;  &lt;chr&gt;     &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;  &lt;dbl&gt;
+ 1 clust… ITGB1    0.103  NA       0.170   0.352   0.157  -0.149   0.413  -0.548
+ 2 clust… ITGB1   -0.0679 -0.170  NA       0.182  -0.0139 -0.320   0.243  -0.719
+ 3 clust… ITGB1   -0.250  -0.352  -0.182  NA      -0.196  -0.502   0.0607 -0.901
+ 4 clust… ITGB1   -0.0540 -0.157   0.0139  0.196  NA      -0.306   0.256  -0.705
+ 5 clust… ITGB1    0.252   0.149   0.320   0.502   0.306  NA       0.562  -0.399
+ 6 clust… ITGB1   -0.310  -0.413  -0.243  -0.0607 -0.256  -0.562  NA      -0.961
+ 7 clust… ITGB1    0.651   0.548   0.719   0.901   0.705   0.399   0.961  NA    
+ 8 clust… ITGB1   -0.238  -0.341  -0.170   0.0118 -0.184  -0.490   0.0725 -0.889
+ 9 clust… ITGB1    0.540  NA       0.0595  0.191   0.115   0.0953  0.658  -0.349
+10 clust… ITGB1    0.480  -0.0595 NA       0.132   0.0555  0.0358  0.598  -0.409
+# ℹ 1,232 more rows
+# ℹ 1 more variable: `9` &lt;dbl&gt;</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb36"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb36-1"><a href="#cb36-1" aria-hidden="true" tabindex="-1"></a>facet_labels_altred <span class="ot">&lt;-</span> <span class="fu">list</span>(</span>
+<span id="cb36-2"><a href="#cb36-2" aria-hidden="true" tabindex="-1"></a>  <span class="st">'2'</span> <span class="ot">=</span> <span class="st">"Cell state 2"</span>,</span>
+<span id="cb36-3"><a href="#cb36-3" aria-hidden="true" tabindex="-1"></a>  <span class="st">'3'</span> <span class="ot">=</span> <span class="st">"Cell state 3"</span>,</span>
+<span id="cb36-4"><a href="#cb36-4" aria-hidden="true" tabindex="-1"></a>  <span class="st">'4'</span> <span class="ot">=</span> <span class="st">"Cell state 4"</span>,</span>
+<span id="cb36-5"><a href="#cb36-5" aria-hidden="true" tabindex="-1"></a>  <span class="st">'5'</span> <span class="ot">=</span> <span class="st">"Cell state 5"</span>,</span>
+<span id="cb36-6"><a href="#cb36-6" aria-hidden="true" tabindex="-1"></a>  <span class="st">'6'</span> <span class="ot">=</span> <span class="st">"Cell state 6"</span>,</span>
+<span id="cb36-7"><a href="#cb36-7" aria-hidden="true" tabindex="-1"></a>  <span class="st">'7'</span> <span class="ot">=</span> <span class="st">"Cell state 7"</span>,</span>
+<span id="cb36-8"><a href="#cb36-8" aria-hidden="true" tabindex="-1"></a>  <span class="st">'8'</span> <span class="ot">=</span> <span class="st">"Cell state 8"</span>,</span>
+<span id="cb36-9"><a href="#cb36-9" aria-hidden="true" tabindex="-1"></a>  <span class="st">'9'</span> <span class="ot">=</span> <span class="st">"Cell state 9"</span></span>
+<span id="cb36-10"><a href="#cb36-10" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb36-11"><a href="#cb36-11" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-12"><a href="#cb36-12" aria-hidden="true" tabindex="-1"></a>facet_labeller <span class="ot">&lt;-</span> <span class="cf">function</span>(variable,value){</span>
+<span id="cb36-13"><a href="#cb36-13" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(facet_labels_altred[value])</span>
+<span id="cb36-14"><a href="#cb36-14" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb36-15"><a href="#cb36-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb36-16"><a href="#cb36-16" aria-hidden="true" tabindex="-1"></a>plt <span class="ot">&lt;-</span> </span>
+<span id="cb36-17"><a href="#cb36-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">inner_join</span>(</span>
+<span id="cb36-18"><a href="#cb36-18" aria-hidden="true" tabindex="-1"></a>  model_altref <span class="sc">|&gt;</span> </span>
+<span id="cb36-19"><a href="#cb36-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"interaction"</span> <span class="sc">&amp;</span> id <span class="sc">!=</span> <span class="st">"1"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb36-20"><a href="#cb36-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(id, ab_name, term, estimate),</span>
+<span id="cb36-21"><a href="#cb36-21" aria-hidden="true" tabindex="-1"></a>  model_altref <span class="sc">|&gt;</span> </span>
+<span id="cb36-22"><a href="#cb36-22" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"interaction"</span> <span class="sc">&amp;</span> id <span class="sc">==</span> <span class="st">"1"</span>) <span class="sc">|&gt;</span> </span>
+<span id="cb36-23"><a href="#cb36-23" aria-hidden="true" tabindex="-1"></a>    <span class="fu">select</span>(term, ab_name, <span class="at">ref_estimate =</span> estimate),</span>
+<span id="cb36-24"><a href="#cb36-24" aria-hidden="true" tabindex="-1"></a>  <span class="at">by =</span> <span class="fu">c</span>(<span class="st">"term"</span>, <span class="st">"ab_name"</span>)</span>
+<span id="cb36-25"><a href="#cb36-25" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">|&gt;</span> </span>
+<span id="cb36-26"><a href="#cb36-26" aria-hidden="true" tabindex="-1"></a>  <span class="fu">ggplot</span>(<span class="fu">aes</span>(<span class="at">x =</span> ref_estimate, <span class="at">y =</span> estimate)) <span class="sc">+</span></span>
+<span id="cb36-27"><a href="#cb36-27" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_abline</span>(<span class="at">color =</span> <span class="st">"gray"</span>) <span class="sc">+</span></span>
+<span id="cb36-28"><a href="#cb36-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_point</span>(<span class="at">size =</span> <span class="fl">0.1</span>) <span class="sc">+</span></span>
+<span id="cb36-29"><a href="#cb36-29" aria-hidden="true" tabindex="-1"></a>    <span class="fu">facet_wrap</span>(<span class="sc">~</span>id, <span class="at">labeller =</span> facet_labeller, <span class="at">scales =</span> <span class="st">"free"</span>, <span class="at">ncol =</span> <span class="dv">4</span>) <span class="sc">+</span></span>
+<span id="cb36-30"><a href="#cb36-30" aria-hidden="true" tabindex="-1"></a>  my_theme <span class="sc">+</span></span>
+<span id="cb36-31"><a href="#cb36-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(</span>
+<span id="cb36-32"><a href="#cb36-32" aria-hidden="true" tabindex="-1"></a>    <span class="at">x =</span> <span class="st">"Cell state 1 as reference"</span>, <span class="at">y =</span> <span class="st">"Alternative cell state as reference"</span>,</span>
+<span id="cb36-33"><a href="#cb36-33" aria-hidden="true" tabindex="-1"></a>    <span class="at">title =</span> <span class="st">"Effect sizes of interaction term"</span></span>
+<span id="cb36-34"><a href="#cb36-34" aria-hidden="true" tabindex="-1"></a>    )</span>
+<span id="cb36-35"><a href="#cb36-35" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb36-36"><a href="#cb36-36" aria-hidden="true" tabindex="-1"></a>plt</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="02_cell-state-depenedent-drug-response_files/figure-html/unnamed-chunk-8-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="sourceCode cell-code" id="cb37"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb37-1"><a href="#cb37-1" aria-hidden="true" tabindex="-1"></a><span class="fu">ggsave</span>(<span class="fu">here</span>(<span class="st">"figures"</span>,<span class="st">"manuscript"</span>, <span class="st">"Supplemental figures"</span>,  <span class="st">"interaction_term_effectsize_altref.pdf"</span>), plt, </span>
+<span id="cb37-2"><a href="#cb37-2" aria-hidden="true" tabindex="-1"></a>       <span class="at">width =</span> <span class="dv">210</span>, <span class="at">height =</span> <span class="dv">90</span>, <span class="at">units =</span> <span class="st">"mm"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="using-altenative-inputs" class="level2">
+<h2 class="anchored" data-anchor-id="using-altenative-inputs">Using altenative inputs</h2>
+<p>Above we have used the z-score and TMM normalized data to perform the interaction term analysis. Here we just check that using only TMM normalized data (i.e.&nbsp;without subsequent z-score normalization) gives identical p-values for the two-way anova and the regression model.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb38"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb38-1"><a href="#cb38-1" aria-hidden="true" tabindex="-1"></a>formula_tmm <span class="ot">&lt;-</span> ab_count_tmm <span class="sc">~</span> cluster <span class="sc">*</span> treatment</span>
+<span id="cb38-2"><a href="#cb38-2" aria-hidden="true" tabindex="-1"></a>fit_lst_tmm <span class="ot">&lt;-</span> purrr<span class="sc">::</span><span class="fu">map</span>(ab_name_lst, get_fit, dat, formula_tmm)</span>
+<span id="cb38-3"><a href="#cb38-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-4"><a href="#cb38-4" aria-hidden="true" tabindex="-1"></a>model_tmm <span class="ot">&lt;-</span></span>
+<span id="cb38-5"><a href="#cb38-5" aria-hidden="true" tabindex="-1"></a>  purrr<span class="sc">::</span><span class="fu">map</span>(fit_lst_tmm, <span class="cf">function</span>(x) broom<span class="sc">::</span><span class="fu">tidy</span>(x)) <span class="sc">%&gt;%</span></span>
+<span id="cb38-6"><a href="#cb38-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">bind_rows</span>(<span class="at">.id =</span> <span class="st">"ab_name"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-7"><a href="#cb38-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">fdr =</span> <span class="fu">p.adjust</span>(p.value, <span class="at">method =</span> <span class="st">"BH"</span>)) <span class="sc">%&gt;%</span></span>
+<span id="cb38-8"><a href="#cb38-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(<span class="at">term_type =</span> <span class="fu">case_when</span>(</span>
+<span id="cb38-9"><a href="#cb38-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">":"</span>) <span class="sc">~</span> <span class="st">"interaction"</span>,</span>
+<span id="cb38-10"><a href="#cb38-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"(Intercept)"</span>) <span class="sc">~</span> <span class="st">"intercept"</span>,</span>
+<span id="cb38-11"><a href="#cb38-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">str_detect</span>(term, <span class="st">"treatment"</span>) <span class="sc">~</span> <span class="st">"treatment"</span>,</span>
+<span id="cb38-12"><a href="#cb38-12" aria-hidden="true" tabindex="-1"></a>    <span class="cn">TRUE</span> <span class="sc">~</span> <span class="st">"cluster"</span></span>
+<span id="cb38-13"><a href="#cb38-13" aria-hidden="true" tabindex="-1"></a>  ))</span>
+<span id="cb38-14"><a href="#cb38-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-15"><a href="#cb38-15" aria-hidden="true" tabindex="-1"></a>signif_interactions_tmm <span class="ot">&lt;-</span></span>
+<span id="cb38-16"><a href="#cb38-16" aria-hidden="true" tabindex="-1"></a>  model_tmm <span class="sc">%&gt;%</span></span>
+<span id="cb38-17"><a href="#cb38-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(term_type <span class="sc">==</span> <span class="st">"interaction"</span> <span class="sc">&amp;</span> p.value <span class="sc">&lt;</span> <span class="fl">0.05</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-18"><a href="#cb38-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">arrange</span>(fdr) <span class="sc">%&gt;%</span></span>
+<span id="cb38-19"><a href="#cb38-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">separate</span>(term, <span class="at">into =</span> <span class="fu">c</span>(<span class="st">"cluster"</span>, <span class="st">"treatment"</span>), <span class="at">sep =</span> <span class="st">":"</span>, <span class="at">remove =</span> <span class="cn">FALSE</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb38-20"><a href="#cb38-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb38-21"><a href="#cb38-21" aria-hidden="true" tabindex="-1"></a>    <span class="at">treatment =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(treatment, <span class="st">"treatment"</span>, <span class="st">""</span>),</span>
+<span id="cb38-22"><a href="#cb38-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">cluster =</span> stringr<span class="sc">::</span><span class="fu">str_replace</span>(cluster, <span class="st">"cluster"</span>, <span class="st">""</span>)</span>
+<span id="cb38-23"><a href="#cb38-23" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb38-24"><a href="#cb38-24" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb38-25"><a href="#cb38-25" aria-hidden="true" tabindex="-1"></a><span class="fu">sum</span>(signif_interactions_tmm<span class="sc">$</span>p.value <span class="sc">-</span> signif_interactions<span class="sc">$</span>p.value <span class="sc">&gt;</span> <span class="fl">1e-3</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>[1] 0</code></pre>
+</div>
+<div class="sourceCode cell-code" id="cb40"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb40-1"><a href="#cb40-1" aria-hidden="true" tabindex="-1"></a><span class="fu">rm</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+</section>
+<section id="session-info" class="level2">
+<h2 class="anchored" data-anchor-id="session-info">Session info</h2>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb41"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb41-1"><a href="#cb41-1" aria-hidden="true" tabindex="-1"></a>sessioninfo<span class="sc">::</span><span class="fu">session_info</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>─ Session info ───────────────────────────────────────────────────────────────
+ setting  value
+ version  R version 4.3.0 (2023-04-21)
+ os       macOS 14.6.1
+ system   x86_64, darwin20
+ ui       X11
+ language (EN)
+ collate  en_US.UTF-8
+ ctype    en_US.UTF-8
+ tz       Europe/Amsterdam
+ date     2024-10-08
+ pandoc   3.2 @ /Applications/RStudio.app/Contents/Resources/app/quarto/bin/tools/x86_64/ (via rmarkdown)
+
+─ Packages ───────────────────────────────────────────────────────────────────
+ package      * version    date (UTC) lib source
+ backports      1.4.1      2021-12-13 [1] CRAN (R 4.3.0)
+ beeswarm       0.4.0      2021-06-01 [1] CRAN (R 4.3.0)
+ bit            4.0.5      2022-11-15 [1] CRAN (R 4.3.0)
+ bit64          4.0.5      2020-08-30 [1] CRAN (R 4.3.0)
+ broom        * 1.0.5      2023-06-09 [1] CRAN (R 4.3.0)
+ class          7.3-22     2023-05-03 [1] CRAN (R 4.3.0)
+ cli            3.6.1      2023-03-23 [1] CRAN (R 4.3.0)
+ codetools      0.2-19     2023-02-01 [1] CRAN (R 4.3.0)
+ colorspace     2.1-0      2023-01-23 [1] CRAN (R 4.3.0)
+ cowplot        1.1.1      2020-12-30 [1] CRAN (R 4.3.0)
+ crayon         1.5.2      2022-09-29 [1] CRAN (R 4.3.0)
+ data.table     1.14.8     2023-02-17 [1] CRAN (R 4.3.0)
+ dials        * 1.2.0      2023-04-03 [1] CRAN (R 4.3.0)
+ DiceDesign     1.9        2021-02-13 [1] CRAN (R 4.3.0)
+ digest         0.6.31     2022-12-11 [1] CRAN (R 4.3.0)
+ dplyr        * 1.1.2      2023-04-20 [1] CRAN (R 4.3.0)
+ evaluate       0.21       2023-05-05 [1] CRAN (R 4.3.0)
+ fansi          1.0.4      2023-01-22 [1] CRAN (R 4.3.0)
+ farver         2.1.1      2022-07-06 [1] CRAN (R 4.3.0)
+ fastmap        1.1.1      2023-02-24 [1] CRAN (R 4.3.0)
+ forcats      * 1.0.0      2023-01-29 [1] CRAN (R 4.3.0)
+ foreach        1.5.2      2022-02-02 [1] CRAN (R 4.3.0)
+ furrr          0.3.1      2022-08-15 [1] CRAN (R 4.3.0)
+ future         1.32.0     2023-03-07 [1] CRAN (R 4.3.0)
+ future.apply   1.11.0     2023-05-21 [1] CRAN (R 4.3.0)
+ generics       0.1.3      2022-07-05 [1] CRAN (R 4.3.0)
+ ggbeeswarm     0.7.2      2023-04-29 [1] CRAN (R 4.3.0)
+ ggplot2      * 3.4.2      2023-04-03 [1] CRAN (R 4.3.0)
+ globals        0.16.2     2022-11-21 [1] CRAN (R 4.3.0)
+ glue           1.6.2      2022-02-24 [1] CRAN (R 4.3.0)
+ gower          1.0.1      2022-12-22 [1] CRAN (R 4.3.0)
+ GPfit          1.0-8      2019-02-08 [1] CRAN (R 4.3.0)
+ gtable         0.3.3      2023-03-21 [1] CRAN (R 4.3.0)
+ hardhat        1.3.0      2023-03-30 [1] CRAN (R 4.3.0)
+ here         * 1.0.1      2020-12-13 [1] CRAN (R 4.3.0)
+ hms            1.1.3      2023-03-21 [1] CRAN (R 4.3.0)
+ htmltools      0.5.5      2023-03-23 [1] CRAN (R 4.3.0)
+ htmlwidgets    1.6.2      2023-03-17 [1] CRAN (R 4.3.0)
+ infer        * 1.0.4      2022-12-02 [1] CRAN (R 4.3.0)
+ ipred          0.9-14     2023-03-09 [1] CRAN (R 4.3.0)
+ iterators      1.0.14     2022-02-05 [1] CRAN (R 4.3.0)
+ jsonlite       1.8.5      2023-06-05 [1] CRAN (R 4.3.0)
+ knitr        * 1.43       2023-05-25 [1] CRAN (R 4.3.0)
+ labeling       0.4.2      2020-10-20 [1] CRAN (R 4.3.0)
+ lattice        0.21-8     2023-04-05 [1] CRAN (R 4.3.0)
+ lava           1.7.2.1    2023-02-27 [1] CRAN (R 4.3.0)
+ lhs            1.1.6      2022-12-17 [1] CRAN (R 4.3.0)
+ lifecycle      1.0.3      2022-10-07 [1] CRAN (R 4.3.0)
+ listenv        0.9.0      2022-12-16 [1] CRAN (R 4.3.0)
+ lubridate    * 1.9.2      2023-02-10 [1] CRAN (R 4.3.0)
+ magrittr       2.0.3      2022-03-30 [1] CRAN (R 4.3.0)
+ MASS           7.3-60     2023-05-04 [1] CRAN (R 4.3.0)
+ Matrix         1.5-4.1    2023-05-18 [1] CRAN (R 4.3.0)
+ modeldata    * 1.1.0      2023-01-25 [1] CRAN (R 4.3.0)
+ munsell        0.5.0      2018-06-12 [1] CRAN (R 4.3.0)
+ nnet           7.3-19     2023-05-03 [1] CRAN (R 4.3.0)
+ parallelly     1.36.0     2023-05-26 [1] CRAN (R 4.3.0)
+ parsnip      * 1.1.0      2023-04-12 [1] CRAN (R 4.3.0)
+ pillar         1.9.0      2023-03-22 [1] CRAN (R 4.3.0)
+ pkgconfig      2.0.3      2019-09-22 [1] CRAN (R 4.3.0)
+ prodlim        2023.03.31 2023-04-02 [1] CRAN (R 4.3.0)
+ purrr        * 1.0.1      2023-01-10 [1] CRAN (R 4.3.0)
+ R6             2.5.1      2021-08-19 [1] CRAN (R 4.3.0)
+ ragg           1.2.5      2023-01-12 [1] CRAN (R 4.3.0)
+ Rcpp           1.0.10     2023-01-22 [1] CRAN (R 4.3.0)
+ readr        * 2.1.4      2023-02-10 [1] CRAN (R 4.3.0)
+ recipes      * 1.0.6      2023-04-25 [1] CRAN (R 4.3.0)
+ rlang          1.1.1      2023-04-28 [1] CRAN (R 4.3.0)
+ rmarkdown      2.22       2023-06-01 [1] CRAN (R 4.3.0)
+ rpart          4.1.19     2022-10-21 [1] CRAN (R 4.3.0)
+ rprojroot      2.0.3      2022-04-02 [1] CRAN (R 4.3.0)
+ rsample      * 1.1.1      2022-12-07 [1] CRAN (R 4.3.0)
+ rstudioapi     0.14       2022-08-22 [1] CRAN (R 4.3.0)
+ scales       * 1.2.1      2022-08-20 [1] CRAN (R 4.3.0)
+ sessioninfo    1.2.2      2021-12-06 [1] CRAN (R 4.3.0)
+ stringi        1.7.12     2023-01-11 [1] CRAN (R 4.3.0)
+ stringr      * 1.5.0      2022-12-02 [1] CRAN (R 4.3.0)
+ survival       3.5-5      2023-03-12 [1] CRAN (R 4.3.0)
+ systemfonts    1.0.4      2022-02-11 [1] CRAN (R 4.3.0)
+ textshaping    0.3.6      2021-10-13 [1] CRAN (R 4.3.0)
+ tibble       * 3.2.1      2023-03-20 [1] CRAN (R 4.3.0)
+ tidymodels   * 1.1.0      2023-05-01 [1] CRAN (R 4.3.0)
+ tidyr        * 1.3.0      2023-01-24 [1] CRAN (R 4.3.0)
+ tidyselect     1.2.0      2022-10-10 [1] CRAN (R 4.3.0)
+ tidyverse    * 2.0.0      2023-02-22 [1] CRAN (R 4.3.0)
+ timechange     0.2.0      2023-01-11 [1] CRAN (R 4.3.0)
+ timeDate       4022.108   2023-01-07 [1] CRAN (R 4.3.0)
+ tune         * 1.1.1      2023-04-11 [1] CRAN (R 4.3.0)
+ tzdb           0.4.0      2023-05-12 [1] CRAN (R 4.3.0)
+ utf8           1.2.3      2023-01-31 [1] CRAN (R 4.3.0)
+ vctrs          0.6.2      2023-04-19 [1] CRAN (R 4.3.0)
+ vipor          0.4.5      2017-03-22 [1] CRAN (R 4.3.0)
+ vroom          1.6.3      2023-04-28 [1] CRAN (R 4.3.0)
+ withr          2.5.0      2022-03-03 [1] CRAN (R 4.3.0)
+ workflows    * 1.1.3      2023-02-22 [1] CRAN (R 4.3.0)
+ workflowsets * 1.0.1      2023-04-06 [1] CRAN (R 4.3.0)
+ xfun           0.39       2023-04-20 [1] CRAN (R 4.3.0)
+ yaml           2.3.7      2023-01-23 [1] CRAN (R 4.3.0)
+ yardstick    * 1.2.0      2023-04-21 [1] CRAN (R 4.3.0)
+
+ [1] /Library/Frameworks/R.framework/Versions/4.3-x86_64/Resources/library
+
+──────────────────────────────────────────────────────────────────────────────</code></pre>
+</div>
+</div>
+</section>
+
+</main>
+<!-- /main column -->
+<script id="quarto-html-after-body" type="application/javascript">
+window.document.addEventListener("DOMContentLoaded", function (event) {
+  const toggleBodyColorMode = (bsSheetEl) => {
+    const mode = bsSheetEl.getAttribute("data-mode");
+    const bodyEl = window.document.querySelector("body");
+    if (mode === "dark") {
+      bodyEl.classList.add("quarto-dark");
+      bodyEl.classList.remove("quarto-light");
+    } else {
+      bodyEl.classList.add("quarto-light");
+      bodyEl.classList.remove("quarto-dark");
+    }
+  }
+  const toggleBodyColorPrimary = () => {
+    const bsSheetEl = window.document.querySelector("link#quarto-bootstrap");
+    if (bsSheetEl) {
+      toggleBodyColorMode(bsSheetEl);
+    }
+  }
+  toggleBodyColorPrimary();  
+  const icon = "";
+  const anchorJS = new window.AnchorJS();
+  anchorJS.options = {
+    placement: 'right',
+    icon: icon
+  };
+  anchorJS.add('.anchored');
+  const isCodeAnnotation = (el) => {
+    for (const clz of el.classList) {
+      if (clz.startsWith('code-annotation-')) {                     
+        return true;
+      }
+    }
+    return false;
+  }
+  const onCopySuccess = function(e) {
+    // button target
+    const button = e.trigger;
+    // don't keep focus
+    button.blur();
+    // flash "checked"
+    button.classList.add('code-copy-button-checked');
+    var currentTitle = button.getAttribute("title");
+    button.setAttribute("title", "Copied!");
+    let tooltip;
+    if (window.bootstrap) {
+      button.setAttribute("data-bs-toggle", "tooltip");
+      button.setAttribute("data-bs-placement", "left");
+      button.setAttribute("data-bs-title", "Copied!");
+      tooltip = new bootstrap.Tooltip(button, 
+        { trigger: "manual", 
+          customClass: "code-copy-button-tooltip",
+          offset: [0, -8]});
+      tooltip.show();    
+    }
+    setTimeout(function() {
+      if (tooltip) {
+        tooltip.hide();
+        button.removeAttribute("data-bs-title");
+        button.removeAttribute("data-bs-toggle");
+        button.removeAttribute("data-bs-placement");
+      }
+      button.setAttribute("title", currentTitle);
+      button.classList.remove('code-copy-button-checked');
+    }, 1000);
+    // clear code selection
+    e.clearSelection();
+  }
+  const getTextToCopy = function(trigger) {
+      const codeEl = trigger.previousElementSibling.cloneNode(true);
+      for (const childEl of codeEl.children) {
+        if (isCodeAnnotation(childEl)) {
+          childEl.remove();
+        }
+      }
+      return codeEl.innerText;
+  }
+  const clipboard = new window.ClipboardJS('.code-copy-button:not([data-in-quarto-modal])', {
+    text: getTextToCopy
+  });
+  clipboard.on('success', onCopySuccess);
+  if (window.document.getElementById('quarto-embedded-source-code-modal')) {
+    // For code content inside modals, clipBoardJS needs to be initialized with a container option
+    // TODO: Check when it could be a function (https://github.com/zenorocha/clipboard.js/issues/860)
+    const clipboardModal = new window.ClipboardJS('.code-copy-button[data-in-quarto-modal]', {
+      text: getTextToCopy,
+      container: window.document.getElementById('quarto-embedded-source-code-modal')
+    });
+    clipboardModal.on('success', onCopySuccess);
+  }
+    var localhostRegex = new RegExp(/^(?:http|https):\/\/localhost\:?[0-9]*\//);
+    var mailtoRegex = new RegExp(/^mailto:/);
+      var filterRegex = new RegExp('/' + window.location.host + '/');
+    var isInternal = (href) => {
+        return filterRegex.test(href) || localhostRegex.test(href) || mailtoRegex.test(href);
+    }
+    // Inspect non-navigation links and adorn them if external
+ 	var links = window.document.querySelectorAll('a[href]:not(.nav-link):not(.navbar-brand):not(.toc-action):not(.sidebar-link):not(.sidebar-item-toggle):not(.pagination-link):not(.no-external):not([aria-hidden]):not(.dropdown-item):not(.quarto-navigation-tool):not(.about-link)');
+    for (var i=0; i<links.length; i++) {
+      const link = links[i];
+      if (!isInternal(link.href)) {
+        // undo the damage that might have been done by quarto-nav.js in the case of
+        // links that we want to consider external
+        if (link.dataset.originalHref !== undefined) {
+          link.href = link.dataset.originalHref;
+        }
+      }
+    }
+  function tippyHover(el, contentFn, onTriggerFn, onUntriggerFn) {
+    const config = {
+      allowHTML: true,
+      maxWidth: 500,
+      delay: 100,
+      arrow: false,
+      appendTo: function(el) {
+          return el.parentElement;
+      },
+      interactive: true,
+      interactiveBorder: 10,
+      theme: 'quarto',
+      placement: 'bottom-start',
+    };
+    if (contentFn) {
+      config.content = contentFn;
+    }
+    if (onTriggerFn) {
+      config.onTrigger = onTriggerFn;
+    }
+    if (onUntriggerFn) {
+      config.onUntrigger = onUntriggerFn;
+    }
+    window.tippy(el, config); 
+  }
+  const noterefs = window.document.querySelectorAll('a[role="doc-noteref"]');
+  for (var i=0; i<noterefs.length; i++) {
+    const ref = noterefs[i];
+    tippyHover(ref, function() {
+      // use id or data attribute instead here
+      let href = ref.getAttribute('data-footnote-href') || ref.getAttribute('href');
+      try { href = new URL(href).hash; } catch {}
+      const id = href.replace(/^#\/?/, "");
+      const note = window.document.getElementById(id);
+      if (note) {
+        return note.innerHTML;
+      } else {
+        return "";
+      }
+    });
+  }
+  const xrefs = window.document.querySelectorAll('a.quarto-xref');
+  const processXRef = (id, note) => {
+    // Strip column container classes
+    const stripColumnClz = (el) => {
+      el.classList.remove("page-full", "page-columns");
+      if (el.children) {
+        for (const child of el.children) {
+          stripColumnClz(child);
+        }
+      }
+    }
+    stripColumnClz(note)
+    if (id === null || id.startsWith('sec-')) {
+      // Special case sections, only their first couple elements
+      const container = document.createElement("div");
+      if (note.children && note.children.length > 2) {
+        container.appendChild(note.children[0].cloneNode(true));
+        for (let i = 1; i < note.children.length; i++) {
+          const child = note.children[i];
+          if (child.tagName === "P" && child.innerText === "") {
+            continue;
+          } else {
+            container.appendChild(child.cloneNode(true));
+            break;
+          }
+        }
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(container);
+        }
+        return container.innerHTML
+      } else {
+        if (window.Quarto?.typesetMath) {
+          window.Quarto.typesetMath(note);
+        }
+        return note.innerHTML;
+      }
+    } else {
+      // Remove any anchor links if they are present
+      const anchorLink = note.querySelector('a.anchorjs-link');
+      if (anchorLink) {
+        anchorLink.remove();
+      }
+      if (window.Quarto?.typesetMath) {
+        window.Quarto.typesetMath(note);
+      }
+      // TODO in 1.5, we should make sure this works without a callout special case
+      if (note.classList.contains("callout")) {
+        return note.outerHTML;
+      } else {
+        return note.innerHTML;
+      }
+    }
+  }
+  for (var i=0; i<xrefs.length; i++) {
+    const xref = xrefs[i];
+    tippyHover(xref, undefined, function(instance) {
+      instance.disable();
+      let url = xref.getAttribute('href');
+      let hash = undefined; 
+      if (url.startsWith('#')) {
+        hash = url;
+      } else {
+        try { hash = new URL(url).hash; } catch {}
+      }
+      if (hash) {
+        const id = hash.replace(/^#\/?/, "");
+        const note = window.document.getElementById(id);
+        if (note !== null) {
+          try {
+            const html = processXRef(id, note.cloneNode(true));
+            instance.setContent(html);
+          } finally {
+            instance.enable();
+            instance.show();
+          }
+        } else {
+          // See if we can fetch this
+          fetch(url.split('#')[0])
+          .then(res => res.text())
+          .then(html => {
+            const parser = new DOMParser();
+            const htmlDoc = parser.parseFromString(html, "text/html");
+            const note = htmlDoc.getElementById(id);
+            if (note !== null) {
+              const html = processXRef(id, note);
+              instance.setContent(html);
+            } 
+          }).finally(() => {
+            instance.enable();
+            instance.show();
+          });
+        }
+      } else {
+        // See if we can fetch a full url (with no hash to target)
+        // This is a special case and we should probably do some content thinning / targeting
+        fetch(url)
+        .then(res => res.text())
+        .then(html => {
+          const parser = new DOMParser();
+          const htmlDoc = parser.parseFromString(html, "text/html");
+          const note = htmlDoc.querySelector('main.content');
+          if (note !== null) {
+            // This should only happen for chapter cross references
+            // (since there is no id in the URL)
+            // remove the first header
+            if (note.children.length > 0 && note.children[0].tagName === "HEADER") {
+              note.children[0].remove();
+            }
+            const html = processXRef(null, note);
+            instance.setContent(html);
+          } 
+        }).finally(() => {
+          instance.enable();
+          instance.show();
+        });
+      }
+    }, function(instance) {
+    });
+  }
+      let selectedAnnoteEl;
+      const selectorForAnnotation = ( cell, annotation) => {
+        let cellAttr = 'data-code-cell="' + cell + '"';
+        let lineAttr = 'data-code-annotation="' +  annotation + '"';
+        const selector = 'span[' + cellAttr + '][' + lineAttr + ']';
+        return selector;
+      }
+      const selectCodeLines = (annoteEl) => {
+        const doc = window.document;
+        const targetCell = annoteEl.getAttribute("data-target-cell");
+        const targetAnnotation = annoteEl.getAttribute("data-target-annotation");
+        const annoteSpan = window.document.querySelector(selectorForAnnotation(targetCell, targetAnnotation));
+        const lines = annoteSpan.getAttribute("data-code-lines").split(",");
+        const lineIds = lines.map((line) => {
+          return targetCell + "-" + line;
+        })
+        let top = null;
+        let height = null;
+        let parent = null;
+        if (lineIds.length > 0) {
+            //compute the position of the single el (top and bottom and make a div)
+            const el = window.document.getElementById(lineIds[0]);
+            top = el.offsetTop;
+            height = el.offsetHeight;
+            parent = el.parentElement.parentElement;
+          if (lineIds.length > 1) {
+            const lastEl = window.document.getElementById(lineIds[lineIds.length - 1]);
+            const bottom = lastEl.offsetTop + lastEl.offsetHeight;
+            height = bottom - top;
+          }
+          if (top !== null && height !== null && parent !== null) {
+            // cook up a div (if necessary) and position it 
+            let div = window.document.getElementById("code-annotation-line-highlight");
+            if (div === null) {
+              div = window.document.createElement("div");
+              div.setAttribute("id", "code-annotation-line-highlight");
+              div.style.position = 'absolute';
+              parent.appendChild(div);
+            }
+            div.style.top = top - 2 + "px";
+            div.style.height = height + 4 + "px";
+            div.style.left = 0;
+            let gutterDiv = window.document.getElementById("code-annotation-line-highlight-gutter");
+            if (gutterDiv === null) {
+              gutterDiv = window.document.createElement("div");
+              gutterDiv.setAttribute("id", "code-annotation-line-highlight-gutter");
+              gutterDiv.style.position = 'absolute';
+              const codeCell = window.document.getElementById(targetCell);
+              const gutter = codeCell.querySelector('.code-annotation-gutter');
+              gutter.appendChild(gutterDiv);
+            }
+            gutterDiv.style.top = top - 2 + "px";
+            gutterDiv.style.height = height + 4 + "px";
+          }
+          selectedAnnoteEl = annoteEl;
+        }
+      };
+      const unselectCodeLines = () => {
+        const elementsIds = ["code-annotation-line-highlight", "code-annotation-line-highlight-gutter"];
+        elementsIds.forEach((elId) => {
+          const div = window.document.getElementById(elId);
+          if (div) {
+            div.remove();
+          }
+        });
+        selectedAnnoteEl = undefined;
+      };
+        // Handle positioning of the toggle
+    window.addEventListener(
+      "resize",
+      throttle(() => {
+        elRect = undefined;
+        if (selectedAnnoteEl) {
+          selectCodeLines(selectedAnnoteEl);
+        }
+      }, 10)
+    );
+    function throttle(fn, ms) {
+    let throttle = false;
+    let timer;
+      return (...args) => {
+        if(!throttle) { // first call gets through
+            fn.apply(this, args);
+            throttle = true;
+        } else { // all the others get throttled
+            if(timer) clearTimeout(timer); // cancel #2
+            timer = setTimeout(() => {
+              fn.apply(this, args);
+              timer = throttle = false;
+            }, ms);
+        }
+      };
+    }
+      // Attach click handler to the DT
+      const annoteDls = window.document.querySelectorAll('dt[data-target-cell]');
+      for (const annoteDlNode of annoteDls) {
+        annoteDlNode.addEventListener('click', (event) => {
+          const clickedEl = event.target;
+          if (clickedEl !== selectedAnnoteEl) {
+            unselectCodeLines();
+            const activeEl = window.document.querySelector('dt[data-target-cell].code-annotation-active');
+            if (activeEl) {
+              activeEl.classList.remove('code-annotation-active');
+            }
+            selectCodeLines(clickedEl);
+            clickedEl.classList.add('code-annotation-active');
+          } else {
+            // Unselect the line
+            unselectCodeLines();
+            clickedEl.classList.remove('code-annotation-active');
+          }
+        });
+      }
+  const findCites = (el) => {
+    const parentEl = el.parentElement;
+    if (parentEl) {
+      const cites = parentEl.dataset.cites;
+      if (cites) {
+        return {
+          el,
+          cites: cites.split(' ')
+        };
+      } else {
+        return findCites(el.parentElement)
+      }
+    } else {
+      return undefined;
+    }
+  };
+  var bibliorefs = window.document.querySelectorAll('a[role="doc-biblioref"]');
+  for (var i=0; i<bibliorefs.length; i++) {
+    const ref = bibliorefs[i];
+    const citeInfo = findCites(ref);
+    if (citeInfo) {
+      tippyHover(citeInfo.el, function() {
+        var popup = window.document.createElement('div');
+        citeInfo.cites.forEach(function(cite) {
+          var citeDiv = window.document.createElement('div');
+          citeDiv.classList.add('hanging-indent');
+          citeDiv.classList.add('csl-entry');
+          var biblioDiv = window.document.getElementById('ref-' + cite);
+          if (biblioDiv) {
+            citeDiv.innerHTML = biblioDiv.innerHTML;
+          }
+          popup.appendChild(citeDiv);
+        });
+        return popup.innerHTML;
+      });
+    }
+  }
+});
+</script>
+</div> <!-- /content -->
+
+
+
+
+</body></html>

@@ -40,6 +40,21 @@ presentation_theme <- theme(
   strip.background = element_rect(fill = NA)
 )
 
+manuscript_theme <- theme(
+  # Overall
+  text = element_text(colour = "black", size = 6, family = 'Helvetica'),
+  line = element_line(colour = "black", size = .3),
+  title = element_text(colour = "black", size = 6, family = 'Helvetica'),
+  axis.title = element_text(colour = "black"),
+  axis.text = element_text(colour = "black", size = 6, family = 'Helvetica'),
+  # Legend
+  legend.text = element_text(colour = "black", size = 6, family = 'Helvetica'),
+  legend.key = element_blank(),
+  # Facet labels
+  strip.text = element_text(colour = "black", size = 6, family = 'Helvetica',
+                            hjust = 0),
+)
+
 col_lst <- c('EGF' = 'lightgray', # "#228B22"
              'ip70S6K_EGF' = '#0496A5', # HEX code "#ADD8E6"
              'iRSK_EGF' = '#E26D03')
