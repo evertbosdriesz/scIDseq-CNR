@@ -1,6 +1,8 @@
 ---
 title: "Predicting cell state from signaling activity"
-author: "Evert Bosdriesz"
+author:
+  - Tim Stohn
+  - Evert Bosdriesz
 toc: true
 format:
   html:
@@ -137,7 +139,7 @@ knitr::kable(sampleSize)
 ## Training the model
 
 We will train two types of models. 
-Predicting the cell state from the cell state markers (as a positive control) and predicting it from the signaling state markers **that were not used in defining the cell state*.
+Predicting the cell state from the cell state markers (as a positive control) and predicting it from the signaling state markers **that were not used in defining the cell state**.
 
 ```{r dat_sigstate}
 dat_cellstate <- select(dat_zscore, all_of(c("cluster", "sample_id", 
@@ -396,9 +398,9 @@ For predicting the cell state from signaling markers we achieve an accuracy of 5
 #parameters
 hyperparams <- expand.grid(min_n = c(2, 5,10), mtry = c(2, 5,10), trees = c(500, 1000, 2000))
 
-#data_cell <- dat_cellstate %>% select(-c("sample_id", "treatment"))
-#estimates_cellstate_rf <- predict_performance(data_cell, rf_mod_grid_search, hyperparams, repeats = 5)
-#save(estimates_cellstate_rf, file = here("data", "cellstate-prediction", "Results_CellState_RF.RData"))
+# data_cell <- dat_cellstate %>% select(-c("sample_id", "treatment"))
+# estimates_cellstate_rf <- predict_performance(data_cell, rf_mod_grid_search, hyperparams, repeats = 5)
+# save(estimates_cellstate_rf, file = here("data", "cellstate-prediction", "Results_CellState_RF.RData"))
 estimates_cellstate_rf <- get(load(here("data", "cellstate-prediction", "Results_CellState_RF.RData")))
 
 #data_sig <- dat_sigstate %>% select(-c("sample_id", "treatment"))
@@ -413,7 +415,7 @@ sig <- visualize_performance(estimates_sigstate_rf, "Random Forest", "Signaling-
 #the plot reports the percentage of predictions belonging to specific group
 combined_plots <- cell + sig + plot_layout(ncol = 2, axes = 'collect')
 combined_plots
-ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/RF.pdf", combined_plots, width = 10, height = 5, units = "in")
+#ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/RF.pdf", combined_plots, width = 10, height = 5, units = "in")
 
 ```
 
@@ -465,9 +467,7 @@ sig <- visualize_performance(estimates_sigstate_mlr, "Multinomial Logistic Regre
 #the plot reports the percentage of predictions belonging to specific group
 combined_plots <- cell + sig + plot_layout(ncol = 2, axes = 'collect')
 combined_plots
-ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/MLR.pdf", combined_plots, width = 10, height = 5, units = "in")
-
-```
+s```
 
 ### SVM
 
@@ -502,8 +502,6 @@ sig <- visualize_performance(estimates_sigstate_svm, "Support Vector Machine", "
 #the plot reports the percentage of predictions belonging to specific group
 combined_plots <- cell + sig + plot_layout(ncol = 2, axes = 'collect')
 combined_plots
-ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/SVM.pdf", combined_plots, width = 10, height = 5, units = "in")
-
 
 ```
 
@@ -619,9 +617,11 @@ plot <- ggplot(result, aes(x = method, y = mean, fill = factor(state))) +
   
 plot
 
-ggsave("/Users/t.stohn/Desktop/Projects/scIDseq_Niels/figures/BarplotPredictionAccuracy.pdf", plot, width = 5, height = 5, units = "in")
-
-
 ```
 
-<!-- ## Conclusion -->
+
+## Session info
+
+```{r sessioninfo}
+sessioninfo::session_info()
+```
