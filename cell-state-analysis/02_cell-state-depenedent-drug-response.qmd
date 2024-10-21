@@ -445,7 +445,7 @@ hc_treats <- filter(model_interaction, term_type == "interaction") %>%
 
 plt <- model_interaction %>% 
   filter(term_type == "interaction") %>%
-  mutate(significant = p.value < 0.05) %>%
+  mutate(significant = fdr < 0.05) %>%
   separate(term, into = c("cluster", "treatment"), sep = ":", remove = FALSE) %>%
   mutate(
     treatment = stringr::str_replace(treatment, "treatment", ""),
@@ -460,13 +460,14 @@ plt <- model_interaction %>%
   scale_size(range = c(0,5)) +
   scale_color_manual(breaks = c(TRUE, FALSE), values = c("black", "white")) +
   colorspace::scale_fill_continuous_diverging("Blue-Red 2", name = "Effect size") +
-  cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica") +
+  cowplot::theme_minimal_grid(font_size = 9, font_family = "Helvetica", line_size = 0.25) +
   theme(axis.text.x = element_text(angle = 90, hjust = 0)) +
   labs(x = "", y = "Cell state") +
   #scale_x_discrete(position = "top") +
   guides(color = FALSE) +
   facet_wrap(~treatment, nrow = 2) +
   scale_x_discrete(position = "top") 
+
 plt
 ggsave(here("figures",  "interaction-terms-ref=C1.pdf"), plt, width = 10, height = 4)
 ```
